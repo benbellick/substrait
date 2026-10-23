@@ -31,9 +31,7 @@ Options follow the [scalar function option rules](scalar_functions.md#options).
 
 Value arguments use `FunctionArgument.value`, type arguments use `FunctionArgument.type`, and enumeration arguments use `FunctionArgument.enum`. Arguments are not restricted to literals unless the function definition requires a constant argument.
 
-Value arguments accept nullable and non-nullable input types. Their outermost nullability is ignored for type matching and type-parameter binding; nested nullability is preserved. Argument type declarations must not mark the outermost type nullable. Output field nullability comes from the output type, not automatically from argument nullability. Each function defines its behavior for NULL argument values.
-
-A table function call is separate from `Expression` because it produces rows rather than a single value. Its output struct fields become generated columns in positional order; the struct is not emitted as a single column. Individual fields may be nullable, but a nullable outer struct does not represent an empty result. An empty result means zero rows.
+Table functions always follow the [scalar `DECLARED_OUTPUT` nullability rules](scalar_functions.md#nullability-handling), with the additional requirement that the output type is a non-nullable struct.
 
 Names are not part of the output type. A relation can supply optional names through `RelCommon.hint.output_names`, or a plan root can supply them through `RelRoot.names`.
 
