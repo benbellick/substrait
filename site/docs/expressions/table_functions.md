@@ -44,8 +44,6 @@ Every call must declare a concrete `output_type`, regardless of whether its YAML
 
 When an implementation declares `return`, the call's `output_type` must match that expression evaluated with the bound argument types and nullability rules.
 
-Return expressions may be concrete or use type parameters bound from the arguments. The [functions_table extension](../extensions/functions_table.md) defines `generate_series` overloads with concrete return types of `struct<i64>` or `struct<i32>`.
-
 ### Schemas Determined by Plan Producer
 
 An implementation may omit `return` when the producer determines the output schema using argument values, external information, or other function-specific knowledge rather than a YAML type expression. No additional marker is required. The producer must still provide the concrete schema in the call's `output_type` field.
