@@ -19,7 +19,7 @@ Table functions are declared under `table_functions` in extension YAML files.
 | Return Type | A type expression that resolves to a non-nullable struct. May be omitted when the producer determines the schema from argument values or external information. | Optional, see [Schema Determination](#schema-determination). |
 | Implementation Map | Locations of function implementations. | Optional |
 
-Each implementation may declare an `options` map in YAML. Each named option declares its allowed `values` and may include a `description`. Calls select preferences using `FunctionOption` in the protobuf `options` field. Options follow the same preference and omission rules as [scalar function options](scalar_functions.md#options) and are not part of the function signature.
+Options follow the [scalar function option rules](scalar_functions.md#options).
 
 ## Table Function Calls
 
@@ -30,7 +30,7 @@ Each implementation may declare an `options` map in YAML. Each named option decl
 | `options` | Named behavioral preferences using the implementation's declared options. | Optional |
 | `output_type` | The concrete, non-nullable struct type of every generated row. | Required |
 
-Value arguments use `FunctionArgument.value`, type arguments use `FunctionArgument.type`, and enumeration arguments use `FunctionArgument.enum`. The containing relational operator determines the scope of field references. Arguments are not restricted to literals unless the function definition requires a constant argument.
+Value arguments use `FunctionArgument.value`, type arguments use `FunctionArgument.type`, and enumeration arguments use `FunctionArgument.enum`. Arguments are not restricted to literals unless the function definition requires a constant argument.
 
 A table function call is separate from `Expression` because it produces rows rather than a single value. Its output struct fields become generated columns in positional order; the struct is not emitted as a single column. Individual fields may be nullable, but a nullable outer struct does not represent an empty result. An empty result means zero rows.
 
@@ -60,8 +60,6 @@ The producer resolves the schema argument's value and declares the resulting str
 --8<-- "examples/proto-textformat/table_function/producer_resolved_schema.textproto"
 ```
 
-A function like `read_parquet(path)` may instead require inspecting a file's structure. The same contract applies. The columns cannot change between generated rows.
-
 ## Standalone Invocation Examples
 
 These examples are `TableFunctionRel` messages. Each contains the function call in its `function` field. Function anchor 1 refers to the indicated function in the `functions_table` extension.
@@ -79,8 +77,6 @@ Generate integers from 1 to 100 using `generate_series:i64_i64_i64` with an expl
 ```
 
 The SQL equivalent is `SELECT * FROM generate_series(1, 100, 1)`.
-
-The leaf relation can be composed with other relational operators. For example, placing a `FilterRel` above a `TableFunctionRel` filters the generated rows without changing the function call.
 
 === "TableFunction Message"
 

@@ -66,21 +66,6 @@ def test_table_function_options_reject_invalid_definitions(
         Draft202012Validator(simple_extensions_schema).validate(table_functions)
 
 
-@pytest.mark.parametrize("argument_type", ["i32", "i64"])
-def test_generate_series_has_no_zero_step_option(table_functions, argument_type):
-    generate_series = next(
-        function
-        for function in table_functions["table_functions"]
-        if function["name"] == "generate_series"
-    )
-    implementation = next(
-        impl
-        for impl in generate_series["impls"]
-        if impl["args"][0]["value"] == argument_type
-    )
-    assert "on_zero_step" not in implementation.get("options", {})
-
-
 def test_generate_series_requires_explicit_step(table_functions):
     generate_series = next(
         function

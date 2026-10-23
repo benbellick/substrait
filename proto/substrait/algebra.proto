@@ -640,8 +640,7 @@ enum FetchMode {
 }
 
 // Invokes a table function once in the current evaluation context.
-// This leaf relation has no local input row. Function arguments may reference
-// an enclosing scope when evaluated within a correlated subquery.
+// This leaf relation has no local input row.
 message TableFunctionRel {
   RelCommon common = 1;
 
