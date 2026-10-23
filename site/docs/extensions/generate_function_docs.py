@@ -89,7 +89,12 @@ def write_markdown(file_obj: dict, file_name: str) -> None:
                 # If the return value for the function implementation is multiple lines long,
                 # print each line separately. This is the case for some functions in
                 # functions_arithmetic_decimal.yaml
-                if "\n" in impl["return"]:
+                if "return" not in impl:
+                    mdFile.new_line(
+                        f"- {function_name}({func_concat_arg_input_values}): -> "
+                        f"`schema determined at runtime`"
+                    )
+                elif "\n" in impl["return"]:
                     mdFile.new_line(
                         f"- {function_name}({func_concat_arg_input_values}): -> "
                     )

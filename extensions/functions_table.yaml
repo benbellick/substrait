@@ -1,0 +1,160 @@
+%YAML 1.2
+---
+# Table functions: Functions that produce relations (zero or more records).
+urn: extension:io.substrait:functions_table
+table_functions:
+  - name: "generate_series"
+    description: >-
+      Generates a series of integer values from start to stop, incrementing by step.
+
+      Produces zero or more records containing a single integer value. The series
+      includes both the start and stop values if they fall on a step boundary.
+      If step is positive, stops when the value exceeds stop. If step is negative,
+      stops when the value is less than stop. Returns empty if step is zero or if
+      the step direction doesn't allow reaching stop from start.
+    impls:
+      - args:
+          - name: start
+            value: i64
+            description: The starting value of the series
+          - name: stop
+            value: i64
+            description: The ending value of the series (inclusive)
+          - name: step
+            value: i64
+            description: The increment between values
+        return:
+          names:
+            - value
+          struct:
+            types:
+              - i64
+      - args:
+          - name: start
+            value: i32
+            description: The starting value of the series
+          - name: stop
+            value: i32
+            description: The ending value of the series (inclusive)
+          - name: step
+            value: i32
+            description: The increment between values
+        return:
+          names:
+            - value
+          struct:
+            types:
+              - i32
+      - args:
+          - name: start
+            value: i64
+            description: The starting value of the series
+          - name: stop
+            value: i64
+            description: The ending value of the series (inclusive)
+        return:
+          names:
+            - value
+          struct:
+            types:
+              - i64
+      - args:
+          - name: start
+            value: i32
+            description: The starting value of the series
+          - name: stop
+            value: i32
+            description: The ending value of the series (inclusive)
+        return:
+          names:
+            - value
+          struct:
+            types:
+              - i32
+  - name: "unnest"
+    description: >-
+      Expands one to four list expressions into rows, with one output column per list.
+      Lists may have different element types.
+
+      When multiple lists are provided, expands them in parallel (like a zip operation).
+      For example, unnest([1,2], ['a']) produces rows: (1,'a'), (2,NULL).
+      Shorter lists are padded with NULLs, so every output column is nullable for
+      multi-list overloads. When all lists are empty, produces zero rows.
+
+      These fixed-arity overloads enumerate the currently supported signatures.
+      General derivation of an arbitrary number of output columns is left for future work.
+    impls:
+      - args:
+          - name: input
+            value: list<any1>
+            description: The list to unnest
+        nullability: DECLARED_OUTPUT
+        return:
+          names:
+            - element
+          struct:
+            types:
+              - any1
+      - args:
+          - name: input1
+            value: list<any1>
+            description: The first list to unnest
+          - name: input2
+            value: list<any2>
+            description: The second list to unnest
+        nullability: DECLARED_OUTPUT
+        return:
+          names:
+            - element1
+            - element2
+          struct:
+            types:
+              - any1?
+              - any2?
+      - args:
+          - name: input1
+            value: list<any1>
+            description: The first list to unnest
+          - name: input2
+            value: list<any2>
+            description: The second list to unnest
+          - name: input3
+            value: list<any3>
+            description: The third list to unnest
+        nullability: DECLARED_OUTPUT
+        return:
+          names:
+            - element1
+            - element2
+            - element3
+          struct:
+            types:
+              - any1?
+              - any2?
+              - any3?
+      - args:
+          - name: input1
+            value: list<any1>
+            description: The first list to unnest
+          - name: input2
+            value: list<any2>
+            description: The second list to unnest
+          - name: input3
+            value: list<any3>
+            description: The third list to unnest
+          - name: input4
+            value: list<any4>
+            description: The fourth list to unnest
+        nullability: DECLARED_OUTPUT
+        return:
+          names:
+            - element1
+            - element2
+            - element3
+            - element4
+          struct:
+            types:
+              - any1?
+              - any2?
+              - any3?
+              - any4?
