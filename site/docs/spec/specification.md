@@ -33,7 +33,7 @@ The specification has passed the initial design phase and is now in the final st
 
 | Section                                                      | Description                                                  |
 | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| [Table Functions](../expressions/table_functions.md)              | Functions that produce zero or more rows per invocation. A shared `TableFunction` message defines the call, while relational operators define its evaluation context. `TableFunctionRel` provides standalone invocation; separate per-input-row operators can reuse the same call representation. Examples include sequence generation (`generate_series`) and expanding collections (`unnest`). |
+| [Table Functions](../expressions/table_functions.md)              | Functions that produce zero or more rows per invocation. A shared `TableFunction` message defines the call, while relational operators define its evaluation context. `TableFunctionRel` provides standalone invocation; separate per-input-row operators can reuse the same call representation. For example, `generate_series` generates numeric sequences. |
 
 
 ## Components (Designed but not Implemented)
