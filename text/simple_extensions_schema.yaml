@@ -389,8 +389,12 @@ $defs:
     properties:
       name:
         type: string
+      deprecated:
+        $ref: "#/$defs/deprecationStatus"
       description:
         type: string
+      metadata: # arbitrary data created by extension author
+        type: object
       impls:
         type: array
         minItems: 1
@@ -398,6 +402,8 @@ $defs:
           type: object
           additionalProperties: false
           properties:
+            deprecated:
+              $ref: "#/$defs/deprecationStatus"
             args:
               $ref: "#/$defs/arguments"
             variadic:

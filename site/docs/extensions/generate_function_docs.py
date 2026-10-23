@@ -52,12 +52,15 @@ def write_markdown(file_obj: dict, file_name: str) -> None:
                 arg_string = []
 
                 for arg in args_list:
-                    if "value" in arg:
+                    if "value" in arg or "type" in arg:
+                        argument_type = (
+                            arg["value"] if "value" in arg else f"<type> {arg['type']}"
+                        )
                         name = arg.get("name")
                         if name:
-                            arg_string.append(f"{name}: {arg['value']}")
+                            arg_string.append(f"{name}: {argument_type}")
                         else:
-                            arg_string.append(arg["value"])
+                            arg_string.append(argument_type)
                     elif "options" in arg:
                         choices = str(arg["options"])
                         option_name = str(arg["name"]) if "name" in arg else choices
