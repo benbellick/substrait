@@ -35,8 +35,7 @@ def test_table_function_catalog_documents_return_types(tmp_path, monkeypatch):
     assert "Table Functions" in catalog
     assert "generate_series" in catalog
     assert "-> `struct<i64>`" in catalog
-    assert "option:on_zero_step" in catalog
-    assert "on_zero_step ['ERROR', 'EMPTY']" in catalog
+    assert "Raises an error if step is zero." in catalog
 
     producer_resolved = (
         generated_docs / "extensions" / "producer_resolved_table_function.md"

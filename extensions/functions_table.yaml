@@ -12,8 +12,7 @@ table_functions:
       includes both the start and stop values if they fall on a step boundary.
       If step is positive, stops when the value exceeds stop. If step is negative,
       stops when the value is less than stop. Returns empty if the step direction
-      doesn't allow reaching stop from start. For a zero step, behavior is
-      controlled by the on_zero_step option.
+      doesn't allow reaching stop from start. Raises an error if step is zero.
     impls:
       - args:
           - name: start
@@ -25,12 +24,6 @@ table_functions:
           - name: step
             value: i64
             description: The increment between values
-        options:
-          on_zero_step:
-            values: [ERROR, EMPTY]
-            description: >-
-              Behavior when step is zero. ERROR raises an error. EMPTY returns
-              zero rows.
         nullability: DECLARED_OUTPUT
         return: struct<i64>
       - args:
@@ -43,11 +36,5 @@ table_functions:
           - name: step
             value: i32
             description: The increment between values
-        options:
-          on_zero_step:
-            values: [ERROR, EMPTY]
-            description: >-
-              Behavior when step is zero. ERROR raises an error. EMPTY returns
-              zero rows.
         nullability: DECLARED_OUTPUT
         return: struct<i32>

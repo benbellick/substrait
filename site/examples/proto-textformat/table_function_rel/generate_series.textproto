@@ -7,10 +7,6 @@ function {
   arguments { value { literal { i64: 1 } } }
   arguments { value { literal { i64: 100 } } }
   arguments { value { literal { i64: 1 } } }
-  options {
-    name: "on_zero_step"
-    preference: "ERROR"
-  }
   output_type {
     struct {
       types { i64 { nullability: NULLABILITY_REQUIRED } }
