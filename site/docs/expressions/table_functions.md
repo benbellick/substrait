@@ -72,7 +72,9 @@ These examples are `TableFunctionRel` messages. Each contains the shared call in
 
 All `generate_series` overloads require an explicit `step` argument. Producers must supply any default chosen by the source query language.
 
-Generate integers from 1 to 100 using `generate_series:i64_i64_i64` with an explicit step of 1.
+The `on_zero_step` option controls behavior when `step` is zero. `ERROR` raises an error, while `EMPTY` produces zero rows. If the option is omitted, the consumer chooses the behavior; the YAML value order does not define a default. A producer requiring an error must request only `ERROR`, and a consumer unable to provide that behavior must reject the plan.
+
+Generate integers from 1 to 100 using `generate_series:i64_i64_i64` with an explicit step of 1. The example also requests `ERROR` for zero-step handling.
 
 ```protobuf
 --8<-- "examples/proto-textformat/table_function_rel/generate_series.textproto"
