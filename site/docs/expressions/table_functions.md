@@ -33,8 +33,6 @@ Value arguments use `FunctionArgument.value`, type arguments use `FunctionArgume
 
 Table functions always follow the [scalar `DECLARED_OUTPUT` nullability rules](scalar_functions.md#nullability-handling), with the additional requirement that the output type is a non-nullable struct.
 
-Names are not part of the output type. A relation can supply optional names through `RelCommon.hint.output_names`, or a plan root can supply them through `RelRoot.names`.
-
 ## Schema Determination
 
 Every call must declare a concrete `output_type`, regardless of whether its YAML implementation declares a `return` expression. The output type is fixed for the call, and every generated row must conform to it.
