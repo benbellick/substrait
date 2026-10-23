@@ -35,6 +35,9 @@ def test_table_function_catalog_documents_return_types(tmp_path, monkeypatch):
     assert "Table Functions" in catalog
     assert "generate_series" in catalog
     assert "-> `struct<i64>`" in catalog
+    assert (
+        "unnest(`input1: list<any1>`, `input2: list<any2>`): -> `struct<any1?, any2?>`"
+    ) in catalog
 
     producer_resolved = (
         generated_docs / "extensions" / "producer_resolved_table_function.md"

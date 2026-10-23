@@ -144,7 +144,7 @@ The output fields may have optional name hints in `RelCommon.hint.output_names`;
 
 ### Use Cases
 
-The `generate_series` function generates a sequence of numbers.
+The `generate_series` function generates a sequence of numbers. The fixed-arity `unnest` overloads expand one to four lists in parallel, with one output column per list.
 
 ### Example
 

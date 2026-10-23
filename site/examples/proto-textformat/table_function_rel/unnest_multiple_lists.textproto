@@ -1,0 +1,33 @@
+common {
+  direct {}
+  hint { output_names: "element1" output_names: "element2" }
+}
+function {
+  function_reference: 1
+  arguments {
+    value {
+      literal {
+        list {
+          values { i32: 1 }
+          values { i32: 2 }
+        }
+      }
+    }
+  }
+  arguments {
+    value {
+      literal {
+        list {
+          values { string: "a" }
+        }
+      }
+    }
+  }
+  output_type {
+    struct {
+      types { i32 { nullability: NULLABILITY_NULLABLE } }
+      types { string { nullability: NULLABILITY_NULLABLE } }
+      nullability: NULLABILITY_REQUIRED
+    }
+  }
+}

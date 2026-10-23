@@ -44,7 +44,7 @@ Every call must declare a concrete `output_type`, regardless of whether its YAML
 
 When an implementation declares `return`, the call's `output_type` must match that expression evaluated with the bound argument types and nullability rules.
 
-Return expressions may be concrete or use type parameters bound from the arguments. The [functions_table extension](../extensions/functions_table.md) defines `generate_series` overloads with concrete return types of `struct<i64>` or `struct<i32>`.
+The [functions_table extension](../extensions/functions_table.md) demonstrates both concrete and parameterized return types. Its `generate_series` overloads declare `struct<i64>` or `struct<i32>`, while the single-list `unnest` overload declares `struct<any1>` and binds `any1` to the list element type.
 
 ### Schemas Determined by Plan Producer
 
@@ -64,6 +64,21 @@ The producer resolves the schema argument's value and declares the resulting str
 
 A function like `read_parquet(path)` may instead require inspecting a file's structure. The same contract applies. The columns cannot change between generated rows, including when a relational operator evaluates the call for successive input rows.
 
+## Multi-List Unnest
+
+`unnest` has fixed-arity overloads for one through four lists. Each argument has an independent type parameter, so lists may have different element types. Each list contributes one output column in argument order.
+
+| Argument types | Return type |
+| -------------- | ----------- |
+| `list<any1>` | `struct<any1>` |
+| `list<any1>`, `list<any2>` | `struct<any1?, any2?>` |
+| `list<any1>`, `list<any2>`, `list<any3>` | `struct<any1?, any2?, any3?>` |
+| `list<any1>`, `list<any2>`, `list<any3>`, `list<any4>` | `struct<any1?, any2?, any3?, any4?>` |
+
+Multiple lists are expanded in parallel, not as a cross product. Shorter lists are padded with NULLs, so all output fields of multi-list overloads are nullable. The single-list overload preserves the element type's nullability. All overloads use `DECLARED_OUTPUT` nullability so the output row itself remains non-nullable.
+
+These overloads enumerate the currently supported signatures, not a fundamental limit of table functions. General type derivation for an arbitrary number of output columns is left for future work. The existing `variadic` property remains available for functions whose return type can already be expressed.
+
 ## Standalone Invocation Examples
 
 These examples are `TableFunctionRel` messages. Each contains the shared call in its `function` field. Function anchor 1 refers to the indicated function in the `functions_table` extension.
@@ -79,6 +94,33 @@ Generate integers from 1 to 100 using `generate_series:i64_i64_i64` with an expl
 ```
 
 The SQL equivalent is `SELECT * FROM generate_series(1, 100, 1)`.
+
+### Unnesting a Single List
+
+Unnest a string list using `unnest:list`.
+
+```protobuf
+--8<-- "examples/proto-textformat/table_function_rel/unnest_single_list.textproto"
+```
+
+The output contains three rows with values `apple`, `banana`, and `cherry`.
+
+### Unnesting Multiple Lists
+
+Unnest an integer list and a shorter string list using `unnest:list_list`, padding the shorter list with NULL.
+
+```protobuf
+--8<-- "examples/proto-textformat/table_function_rel/unnest_multiple_lists.textproto"
+```
+
+The SQL equivalent is `SELECT * FROM UNNEST([1, 2], ['a'])`.
+
+```text
+element1 | element2
+---------+---------
+1        | a
+2        | NULL
+```
 
 The leaf relation can be composed with other relational operators. For example, placing a `FilterRel` above a `TableFunctionRel` filters the generated rows without changing the function call.
 
