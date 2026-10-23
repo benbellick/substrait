@@ -30,7 +30,7 @@ table_functions:
             values: [ERROR, EMPTY]
             description: >-
               Behavior when step is zero. ERROR raises an error. EMPTY returns
-              zero rows. If omitted, the consumer chooses the behavior.
+              zero rows.
         nullability: DECLARED_OUTPUT
         return: struct<i64>
       - args:
@@ -48,6 +48,6 @@ table_functions:
             values: [ERROR, EMPTY]
             description: >-
               Behavior when step is zero. ERROR raises an error. EMPTY returns
-              zero rows. If omitted, the consumer chooses the behavior.
+              zero rows.
         nullability: DECLARED_OUTPUT
         return: struct<i32>
