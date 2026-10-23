@@ -23,12 +23,8 @@ table_functions:
           - name: step
             value: i64
             description: The increment between values
-        return:
-          names:
-            - value
-          struct:
-            types:
-              - i64
+        nullability: DECLARED_OUTPUT
+        return: struct<i64>
       - args:
           - name: start
             value: i32
@@ -39,12 +35,8 @@ table_functions:
           - name: step
             value: i32
             description: The increment between values
-        return:
-          names:
-            - value
-          struct:
-            types:
-              - i32
+        nullability: DECLARED_OUTPUT
+        return: struct<i32>
       - args:
           - name: start
             value: i64
@@ -52,12 +44,8 @@ table_functions:
           - name: stop
             value: i64
             description: The ending value of the series (inclusive)
-        return:
-          names:
-            - value
-          struct:
-            types:
-              - i64
+        nullability: DECLARED_OUTPUT
+        return: struct<i64>
       - args:
           - name: start
             value: i32
@@ -65,12 +53,8 @@ table_functions:
           - name: stop
             value: i32
             description: The ending value of the series (inclusive)
-        return:
-          names:
-            - value
-          struct:
-            types:
-              - i32
+        nullability: DECLARED_OUTPUT
+        return: struct<i32>
   - name: "unnest"
     description: >-
       Expands one to four list expressions into rows, with one output column per list.
@@ -89,12 +73,7 @@ table_functions:
             value: list<any1>
             description: The list to unnest
         nullability: DECLARED_OUTPUT
-        return:
-          names:
-            - element
-          struct:
-            types:
-              - any1
+        return: struct<any1>
       - args:
           - name: input1
             value: list<any1>
@@ -103,14 +82,7 @@ table_functions:
             value: list<any2>
             description: The second list to unnest
         nullability: DECLARED_OUTPUT
-        return:
-          names:
-            - element1
-            - element2
-          struct:
-            types:
-              - any1?
-              - any2?
+        return: struct<any1?, any2?>
       - args:
           - name: input1
             value: list<any1>
@@ -122,16 +94,7 @@ table_functions:
             value: list<any3>
             description: The third list to unnest
         nullability: DECLARED_OUTPUT
-        return:
-          names:
-            - element1
-            - element2
-            - element3
-          struct:
-            types:
-              - any1?
-              - any2?
-              - any3?
+        return: struct<any1?, any2?, any3?>
       - args:
           - name: input1
             value: list<any1>
@@ -146,15 +109,4 @@ table_functions:
             value: list<any4>
             description: The fourth list to unnest
         nullability: DECLARED_OUTPUT
-        return:
-          names:
-            - element1
-            - element2
-            - element3
-            - element4
-          struct:
-            types:
-              - any1?
-              - any2?
-              - any3?
-              - any4?
+        return: struct<any1?, any2?, any3?, any4?>

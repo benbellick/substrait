@@ -92,7 +92,7 @@ def write_markdown(file_obj: dict, file_name: str) -> None:
                 if "return" not in impl:
                     mdFile.new_line(
                         f"- {function_name}({func_concat_arg_input_values}): -> "
-                        f"`schema determined at runtime`"
+                        f"`output schema determined by the producer`"
                     )
                 elif "\n" in impl["return"]:
                     mdFile.new_line(
@@ -132,7 +132,12 @@ functions_folder = os.path.join(str(Path(cur_path).parents[3]), "extensions")
 
 # Get all extension YAML files that define functions
 function_files = []
-function_sections = {"scalar_functions", "aggregate_functions", "window_functions"}
+function_sections = {
+    "scalar_functions",
+    "aggregate_functions",
+    "window_functions",
+    "table_functions",
+}
 for file in sorted(os.listdir(functions_folder)):
     if file.endswith(".yaml"):
         full_path = os.path.join(functions_folder, file)

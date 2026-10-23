@@ -639,41 +639,15 @@ enum FetchMode {
   FETCH_MODE_WITH_TIES = 2;
 }
 
-// Invokes a table-valued function that produces a relation (zero or more records).
-//
-//
-// Table functions produce a table with a schema that can be:
-//   - Statically defined (concrete types in YAML)
-//   - Type-parameterized (derived from argument types, e.g., unnest(list<T>) -> {element: T})
-//
-// Future extensions may add an optional input field to support transformation
-// table functions that operate on input relations.
+// Evaluates a table expression once in the current evaluation context.
+// This leaf relation has no local input row. Function arguments may reference
+// an enclosing scope when evaluated within a correlated subquery.
 message TableFunctionRel {
   RelCommon common = 1;
 
-  // Points to a function_anchor defined in this plan, which must refer
-  // to a table function in the associated YAML file. Avoid using
-  // anchor/reference zero.
-  uint32 function_reference = 2;
-
-  // The arguments to be bound to the function. This must have exactly the
-  // number of arguments specified in the function definition from the YAML file,
-  // and the argument types must also match exactly:
-  //  - Value arguments must be bound using FunctionArgument.value.
-  //  - Type arguments must be bound using FunctionArgument.type.
-  //  - Enum arguments must be bound using FunctionArgument.enum with a
-  //    string that case-insensitively matches one of the allowed options.
-  repeated FunctionArgument arguments = 3;
-
-  // Options to specify behavior for corner cases, or leave behavior
-  // unspecified if the consumer does not need specific behavior in these
-  // cases.
-  repeated FunctionOption options = 5;
-
-  // The concrete output schema of the relation. For schemas which can be derived
-  // from their YAML specification this must match the schema computed by evaluating the
-  // YAML ExpressionNamedStruct with the bound argument types.
-  NamedStruct table_schema = 6;
+  // Required table expression. Its output struct fields form the relation's
+  // columns in field order.
+  TableExpression table_expression = 2;
 
   substrait.extensions.AdvancedExtension advanced_extension = 7;
 }
@@ -1863,6 +1837,44 @@ message Expression {
       // nullability must be NULLABILITY_REQUIRED
       Type.Date current_date = 3;
     }
+  }
+}
+
+// An expression that produces zero or more rows per evaluation rather than
+// a single value. Relational operators define the evaluation context and how
+// generated rows contribute to their output.
+message TableExpression {
+  oneof table_expr_type {
+    TableFunction table_function = 1;
+  }
+
+  // A table function call shared by standalone and per-input-row relations.
+  message TableFunction {
+    // Points to a function_anchor in this plan referring to a table function
+    // in an extension YAML file. 0 is a valid anchor/reference, but prefer
+    // non-zero values for ergonomics.
+    uint32 function_reference = 1;
+
+    // Arguments must match the selected YAML implementation's signature,
+    // including any variadic arguments:
+    //  - Value arguments use FunctionArgument.value.
+    //  - Type arguments use FunctionArgument.type.
+    //  - Enum arguments use FunctionArgument.enum, matching an allowed option
+    //    case-insensitively.
+    // Field references are resolved in the containing operator's context.
+    repeated FunctionArgument arguments = 2;
+
+    // Behavioral preferences following the options declared by the YAML
+    // implementation, with the same rules as scalar function options.
+    repeated FunctionOption options = 3;
+
+    // Required concrete output type. Must be a non-nullable Struct whose
+    // fields represent the generated columns. Every output row must conform
+    // to this type. If the YAML implementation declares a return expression,
+    // this must match that expression evaluated with the bound argument types
+    // and nullability rules. Otherwise, the producer determines the type using
+    // argument values, external information, or other function-specific knowledge.
+    Type output_type = 4;
   }
 }
 

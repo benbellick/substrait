@@ -1,280 +1,141 @@
 # Table Functions
 
-Table functions are functions that produce a relation (zero or more records) as output. Table functions are similar to scalar and aggregate functions but produce relations instead of individual values.
+Table functions produce zero or more rows per invocation. Unlike scalar functions, which produce a single value, a table function call has a struct output type whose fields represent the generated columns.
 
-!!! warning "Partial Implementation"
-    **Currently implemented:** 0-input table functions - leaf operators that take constant arguments and produce relations.
+The callable representation is `TableExpression.TableFunction`, wrapped by a `TableExpression`. Relational operators determine when the expression is evaluated and how its rows contribute to their output. The standalone [Table Function relation](../relations/logical_relations.md#table-function) evaluates it once in the current evaluation context. A separate per-input-row relation, such as the proposed [GenerateRel](https://github.com/substrait-io/substrait/pull/917), can use the same callable representation without defining another kind of table function.
 
-    **Not yet implemented:** Transformation table functions that accept input relations.
+## Function Definition Properties
 
-## Function Signature Properties
+Table functions are declared under `table_functions` in extension YAML files.
 
-Table function signatures contain the properties defined below:
+| Property | Description | Required |
+| -------- | ----------- | -------- |
+| Name | A case-sensitive UTF-8 name used to reference the function. | Required |
+| List of arguments | Value, type, or enumeration arguments, following [scalar function argument types](scalar_functions.md#argument-types). | Optional, defaults to niladic. |
+| Variadic Behavior | Whether the last argument can be repeated, with optional minimum and maximum counts. | Optional, defaults to a single argument. |
+| Nullability Handling | Follows the [scalar function nullability modes](scalar_functions.md#nullability-handling). The return type must resolve to a non-nullable struct. | Optional, defaults to `MIRROR`. |
+| Options | Named behavioral options declared per implementation, following the [scalar function option mechanism](scalar_functions.md#options). | Optional |
+| Description | Human-readable description of the function. | Optional |
+| Return Type | A type expression that resolves to a non-nullable struct. May be omitted when the producer determines the schema from argument values or external information. | Optional, see [Schema Determination](#schema-determination). |
+| Implementation Map | Locations of function implementations. | Optional |
 
-| Property               | Description                                                                                                                                                                                                                                                                                | Required                            |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------- |
-| Name                   | One or more user-friendly, case-sensitive UTF-8 strings that are used to reference this function.                                                                                                                                                                                         | At least one value is required.     |
-| List of arguments      | Argument properties follow the same pattern as [scalar functions](scalar_functions.md#argument-types): value arguments, type arguments, and enumerations. Arguments can be fully defined or calculated with a type expression.                                                             | Optional, defaults to niladic.      |
-| Variadic Behavior      | Whether the last argument of the function is variadic or a single argument. If variadic, the argument can optionally have a lower bound (minimum number of instances) and an upper bound (maximum number of instances).                                                                    | Optional, defaults to single value. |
-| Nullability Handling   | Follows the [scalar function nullability modes](scalar_functions.md#nullability-handling). | Optional, defaults to `MIRROR`. |
-| Description            | Additional description of function for implementers or users. Should be written human-readable to allow exposure to end users. Presented as a map with language => description mappings.                                                                                                  | Optional                            |
-| Return Schema          | The output schema of the relation, expressed as an `ExpressionNamedStruct`. Can be concrete types or type-parameterized (derived from argument types). May be omitted if schema depends on runtime data content (not determinable from function signature).                               | Optional (see [Schema Determination](#schema-determination)) |
-| Implementation Map     | A map of implementation locations for one or more implementations of the given function. Each key is a function implementation type with properties associated with retrieval of that implementation.                                                                                      | Optional                            |
+Each implementation may declare an `options` map in YAML. Each named option declares its allowed `values` and may include a `description`. Calls select preferences using `FunctionOption` in the protobuf `options` field. Options follow the same preference and omission rules as [scalar function options](scalar_functions.md#options) and are not part of the function signature.
 
-Table functions use the same argument types as scalar functions (value arguments, type arguments, and enumerations). See [Scalar Functions - Argument Types](scalar_functions.md#argument-types) for details.
+## Table Function Calls
+
+| Field | Description | Required |
+| ----- | ----------- | -------- |
+| `function_reference` | A function anchor in the plan referring to a table function in an extension YAML file. Zero is valid, though non-zero anchors are preferred for ergonomics. | Required |
+| `arguments` | Arguments matching the selected implementation's signature, including any variadic arguments. | Optional for niladic functions. |
+| `options` | Named behavioral preferences using the implementation's declared options. | Optional |
+| `output_type` | The concrete, non-nullable struct type of every generated row. | Required |
+
+Value arguments use `FunctionArgument.value`, type arguments use `FunctionArgument.type`, and enumeration arguments use `FunctionArgument.enum`. The containing relational operator determines the scope of field references. Arguments are not restricted to literals unless the function definition requires a constant argument.
+
+A table expression is separate from `Expression` because it produces rows rather than a single value. Its output struct fields become generated columns in positional order; the struct is not emitted as a single column. Individual fields may be nullable, but a nullable outer struct does not represent an empty result. An empty result means zero rows.
+
+Names are not part of the output type. A relation can supply optional names through `RelCommon.hint.output_names`, or a plan root can supply them through `RelRoot.names`.
 
 ## Schema Determination
 
-Table function schemas can be specified in two ways, depending on whether the YAML definition includes a `return` field:
+Every call must declare a concrete `output_type`, regardless of whether its YAML implementation declares a `return` expression. The output type is fixed for the call, and every generated row must conform to it.
 
 ### Schemas Derivable from YAML
 
-When a table function's YAML definition includes a `return` field, the schema can be deterministically derived from the function signature and the types of the bound arguments. The plan must include this derived schema in the `table_schema` field with any type parameters resolved.
+When an implementation declares `return`, the call's `output_type` must match that expression evaluated with the bound argument types and nullability rules.
 
-**Example YAML definitions** (from `functions_table.yaml`):
-
-Concrete type example - `generate_series` always produces `{value: i64}`:
-
-```yaml
-- name: "generate_series"
-  impls:
-    - args:
-        - name: start
-          value: i64
-        - name: stop
-          value: i64
-        - name: step
-          value: i64
-      return:
-        names:
-          - value
-        struct:
-          types:
-            - i64
-```
-
-Type-parameterized example - the single-list `unnest` overload derives its output field type from the list element type:
-
-```yaml
-- name: "unnest"
-  impls:
-    - args:
-        - name: input
-          value: list<any1>
-      nullability: DECLARED_OUTPUT
-      return:
-        names:
-          - element
-        struct:
-          types:
-            - any1
-```
+The [functions_table extension](../extensions/functions_table.md) demonstrates both concrete and parameterized return types. Its `generate_series` overloads declare `struct<i64>` or `struct<i32>`, while the single-list `unnest` overload declares `struct<any1>` and binds `any1` to the list element type.
 
 ### Schemas Determined by Plan Producer
 
-When a table function's YAML definition omits the `return` field, the schema cannot be determined from type information alone. In these cases, the plan producer must provide the schema in `table_schema`.
+An implementation may omit `return` when the producer determines the output schema using argument values, external information, or other function-specific knowledge rather than a YAML type expression. No additional marker is required. The producer must still provide the concrete schema in the call's `output_type` field.
 
-**Example:** A function like `read_parquet(path)` where the schema depends on the actual Parquet file's structure - the YAML would omit the `return` field, and the plan producer would provide the concrete schema in `table_schema`.
+For example, this parsing function uses a schema-defining string argument to determine its output columns. Its YAML definition intentionally omits `return`.
 
-!!! note "Required Constraint"
-    **If a table function's YAML definition includes a `return` field, the `table_schema` field in the plan MUST match the YAML definition (with any type parameters resolved based on the bound argument types).**
+```yaml
+--8<-- "examples/extensions/producer_resolved_table_function.yaml"
+```
+
+The producer resolves the schema argument's value and declares the resulting struct in the shared function call. Function anchor 1 refers to `parse_records:str_str` from the example extension.
+
+```protobuf
+--8<-- "examples/proto-textformat/table_function/producer_resolved_schema.textproto"
+```
+
+A function like `read_parquet(path)` may instead require inspecting a file's structure. The same contract applies. The columns cannot change between generated rows, including when a relational operator evaluates the call for successive input rows.
 
 ## Multi-List Unnest
 
 `unnest` has fixed-arity overloads for one through four lists. Each argument has an independent type parameter, so lists may have different element types. Each list contributes one output column in argument order.
 
-| Argument types | Output field types |
-| -------------- | ------------------ |
-| `list<any1>` | `any1` |
-| `list<any1>`, `list<any2>` | `any1?`, `any2?` |
-| `list<any1>`, `list<any2>`, `list<any3>` | `any1?`, `any2?`, `any3?` |
-| `list<any1>`, `list<any2>`, `list<any3>`, `list<any4>` | `any1?`, `any2?`, `any3?`, `any4?` |
+| Argument types | Return type |
+| -------------- | ----------- |
+| `list<any1>` | `struct<any1>` |
+| `list<any1>`, `list<any2>` | `struct<any1?, any2?>` |
+| `list<any1>`, `list<any2>`, `list<any3>` | `struct<any1?, any2?, any3?>` |
+| `list<any1>`, `list<any2>`, `list<any3>`, `list<any4>` | `struct<any1?, any2?, any3?, any4?>` |
 
 Multiple lists are expanded in parallel, not as a cross product. Shorter lists are padded with NULLs, so all output fields of multi-list overloads are nullable. The single-list overload preserves the element type's nullability. All overloads use `DECLARED_OUTPUT` nullability so the output row itself remains non-nullable.
 
-These overloads enumerate the currently supported signatures, not a fundamental limit of table functions. General type derivation for an arbitrary number of output columns is left for future work. The existing `variadic` property remains available for functions whose return schema can already be expressed.
+These overloads enumerate the currently supported signatures, not a fundamental limit of table functions. General type derivation for an arbitrary number of output columns is left for future work. The existing `variadic` property remains available for functions whose return type can already be expressed.
 
-## Usage in Plans
+## Standalone Invocation Examples
 
-Table functions are invoked in plans using the `TableFunctionRel` relation type. Table functions can be used anywhere a relation is expected - as a leaf node, or as input to other relational operators like `FilterRel`, `ProjectRel`, etc.
+These examples are `TableFunctionRel` messages. Each embeds the shared call in `table_expression.table_function`. Function anchor 1 refers to the indicated function in the `functions_table` extension.
 
-For details on the `TableFunctionRel` message structure and properties, see the [Table Function](../relations/logical_relations.md#table-function) section in Logical Relations.
+### Generating a Sequence
 
-## Examples
+Generate integers from 1 to 100 using `generate_series:i64_i64_i64` with an explicit step of 1.
 
-### Example 1: Generating a Sequence
-
-Generate integers from 1 to 100:
-
-```
-TableFunctionRel {
-  function_reference: <generate_series>
-  arguments: [
-    { value: { literal: { i64: 1 } } },
-    { value: { literal: { i64: 100 } } }
-  ]
-  table_schema: {
-    names: ["value"]
-    struct: {
-      types: [{ i64: {} }]
-    }
-  }
-}
+```protobuf
+--8<-- "examples/proto-textformat/table_function_rel/generate_series.textproto"
 ```
 
-**SQL equivalent:** `SELECT * FROM generate_series(1, 100)`
+The SQL equivalent is `SELECT * FROM generate_series(1, 100, 1)`.
 
-**Output:**
-```
-value
------
-1
-2
-3
-...
-100
+### Unnesting a Single List
+
+Unnest a string list using `unnest:list`.
+
+```protobuf
+--8<-- "examples/proto-textformat/table_function_rel/unnest_single_list.textproto"
 ```
 
-### Example 2: Unnest a Literal Array
+The output contains three rows with values `apple`, `banana`, and `cherry`.
 
-Unnest a literal list into rows:
+### Unnesting Multiple Lists
 
-```
-TableFunctionRel {
-  function_reference: <unnest>
-  arguments: [
-    { value: { literal: {
-      list: {
-        values: [
-          { string: { value: "apple" } },
-          { string: { value: "banana" } },
-          { string: { value: "cherry" } }
-        ]
-      }
-    } } }  // Type is list<string>
-  ]
-  table_schema: {
-    names: ["element"]
-    struct: {
-      types: [{ string: {} }]  // T resolved to string from list<string> argument
-    }
-  }
-}
+Unnest an integer list and a shorter string list using `unnest:list_list`, padding the shorter list with NULL.
+
+```protobuf
+--8<-- "examples/proto-textformat/table_function_rel/unnest_multiple_lists.textproto"
 ```
 
-**SQL equivalent:** `SELECT * FROM UNNEST(['apple', 'banana', 'cherry'])`
+The SQL equivalent is `SELECT * FROM UNNEST([1, 2], ['a'])`.
 
-**Output:**
-```
-element
---------
-apple
-banana
-cherry
-```
-
-### Example 2b: Unnest Multiple Lists
-
-Unnest an integer list and a shorter string list in parallel, padding the shorter list with NULL:
-
-```
-TableFunctionRel {
-  function_reference: <unnest>
-  arguments: [
-    { value: { literal: {
-      list: {
-        values: [
-          { i32: 1 },
-          { i32: 2 }
-        ]
-      }
-    } } },  // First list: [1, 2]
-    { value: { literal: {
-      list: {
-        values: [
-          { string: "a" }
-        ]
-      }
-    } } }  // Second list: ['a']
-  ]
-  table_schema: {
-    names: ["element1", "element2"]
-    struct: {
-      types: [
-        { i32: { nullability: NULLABILITY_NULLABLE } },
-        { string: { nullability: NULLABILITY_NULLABLE } }
-      ]
-      nullability: NULLABILITY_REQUIRED
-    }
-  }
-}
-```
-
-**SQL equivalent:** `SELECT * FROM UNNEST([1, 2], ['a'])`
-
-**Output (parallel expansion / zip):**
-```
+```text
 element1 | element2
 ---------+---------
 1        | a
 2        | NULL
 ```
 
-!!! note "Limitation: Correlated Table Functions"
-    **The more sophisticated use case - unnesting a column from an existing table - cannot currently be represented.** For example, the SQL query `SELECT element FROM my_table, UNNEST(my_table.array_column)` would require applying the table function once per row of the input table.
+The leaf relation can be composed with other relational operators. For example, placing a `FilterRel` above a `TableFunctionRel` filters the generated rows without changing the function call.
 
-    This requires **lateral joins** (correlated subqueries where a table function references columns from an outer relation), which are not yet specified in Substrait. Since TableFunctionRel is currently a leaf operator with no input relation, you cannot use field references in the function arguments.
+## Correlated Invocation
 
-    Future extensions will add support for transformation table functions and/or lateral join semantics to handle these cases.
+A standalone `TableFunctionRel` has no local input row, but its arguments may reference an enclosing scope when it appears within a correlated subquery. An inner [lateral join](../relations/logical_relations.md#lateral-join-operation) can evaluate the leaf relation once per left row using outer references to that row.
 
+A dedicated per-input-row relation can instead evaluate the same table expression directly against its input row and append the generated fields to the input fields. Such an operator controls row preservation when the function returns no rows; that behavior is separate from the function's own result.
 
-### Example 3: Composing with Other Operators
+=== "TableExpression Message"
 
-Table functions can be composed with other relational operators. For example, filtering the generated series to get only even numbers:
+    ```proto
+%%% proto.algebra.TableExpression %%%
+    ```
 
-```
-FilterRel {
-  input: {
-    TableFunctionRel {
-      function_reference: <generate_series>
-      arguments: [
-        { value: { literal: { i64: 1 } } },
-        { value: { literal: { i64: 100 } } }
-      ]
-      table_schema: {
-        names: ["value"]
-        struct: {
-          types: [{ i64: {} }]
-        }
-      }
-    }
-  }
-  condition: {
-    scalar_function: {
-      function_reference: <equals>
-      arguments: [
-        {
-          value: {
-            scalar_function: {
-              function_reference: <modulo>
-              arguments: [
-                { value: { selection: { direct_reference: { struct_field: { field: 0 } } } } },
-                { value: { literal: { i64: 2 } } }
-              ]
-            }
-          }
-        },
-        { value: { literal: { i64: 0 } } }
-      ]
-    }
-  }
-}
-```
+=== "TableFunction Message"
 
-## Future Extensions
-
-The current specification focuses on 0-input (generator/leaf) table functions. Future versions may support:
-
-- **Transformation table functions**: Functions that take an input relation and transform it (by adding an optional `input` field to `TableFunctionRel`)
-- **Set-returning functions**: Functions that process input records and produce multiple output records per input
-- **Lateral joins**: Applying table functions to each row of an input relation
+    ```proto
+%%% proto.algebra.TableExpression.TableFunction %%%
+    ```

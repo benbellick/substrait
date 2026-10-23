@@ -33,7 +33,7 @@ The specification has passed the initial design phase and is now in the final st
 
 | Section                                                      | Description                                                  |
 | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| [Table Functions](../expressions/table_functions.md)              | **Partial implementation:** Functions that produce relations (0..N records). Table functions can accept 0 or more input relations. **Currently, only 0-input functions are implemented** - these are leaf operators that take constant arguments and generate data. Examples include sequence generation (`generate_series`) and expanding collections (`unnest`). Transformation table functions that accept input relations are not yet implemented. |
+| [Table Functions](../expressions/table_functions.md)              | Functions that produce zero or more rows per invocation. A shared table expression defines the call, while relational operators define its evaluation context. `TableFunctionRel` provides standalone invocation; separate per-input-row operators can reuse the same call representation. Examples include sequence generation (`generate_series`) and expanding collections (`unnest`). |
 
 
 ## Components (Designed but not Implemented)

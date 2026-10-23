@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import pytest
-from jsonschema import Draft202012Validator
+from jsonschema import Draft202012Validator, ValidationError
 from tests.helpers import EXTENSIONS_DIR, REPO_ROOT, load_extension
 from tests.type.test_type_grammar import parse_type_expression
 
@@ -11,9 +11,60 @@ def table_functions():
     return load_extension(EXTENSIONS_DIR / "functions_table.yaml")
 
 
-def test_table_function_definitions_match_schema(table_functions):
-    schema = load_extension(REPO_ROOT / "text" / "simple_extensions_schema.yaml")
-    Draft202012Validator(schema).validate(table_functions)
+@pytest.fixture
+def simple_extensions_schema():
+    return load_extension(REPO_ROOT / "text" / "simple_extensions_schema.yaml")
+
+
+def test_table_function_definitions_match_schema(
+    table_functions, simple_extensions_schema
+):
+    Draft202012Validator(simple_extensions_schema).validate(table_functions)
+
+
+def test_table_function_return_schema_may_be_omitted(
+    table_functions, simple_extensions_schema
+):
+    del table_functions["table_functions"][0]["impls"][0]["return"]
+    Draft202012Validator(simple_extensions_schema).validate(table_functions)
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        {},
+        {
+            "on_error": {
+                "values": ["ERROR", "NULL"],
+                "description": "Behavior when an error occurs",
+            },
+            "rounding": {"values": ["FLOOR", "CEILING"]},
+        },
+    ],
+)
+def test_table_function_options_match_schema(
+    table_functions, simple_extensions_schema, options
+):
+    table_functions["table_functions"][0]["impls"][0]["options"] = options
+    Draft202012Validator(simple_extensions_schema).validate(table_functions)
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        [],
+        {"on_error": {}},
+        {"on_error": {"values": "ERROR"}},
+        {"on_error": {"values": [123]}},
+        {"on_error": {"values": ["ERROR"], "unknown": True}},
+    ],
+)
+def test_table_function_options_reject_invalid_definitions(
+    table_functions, simple_extensions_schema, options
+):
+    table_functions["table_functions"][0]["impls"][0]["options"] = options
+    with pytest.raises(ValidationError):
+        Draft202012Validator(simple_extensions_schema).validate(table_functions)
 
 
 def test_unnest_supports_one_through_four_lists(table_functions):
@@ -32,12 +83,11 @@ def test_unnest_supports_one_through_four_lists(table_functions):
             f"list<{parameter}>" for parameter in parameters
         ]
         assert impl["nullability"] == "DECLARED_OUTPUT"
-        assert len(impl["return"]["names"]) == argument_count
-        assert impl["return"]["struct"]["types"] == [
+        fields = [
             f"{parameter}?" if argument_count > 1 else parameter
             for parameter in parameters
         ]
+        assert impl["return"] == f"struct<{', '.join(fields)}>"
         for arg in impl["args"]:
             parse_type_expression(arg["value"])
-        for field_type in impl["return"]["struct"]["types"]:
-            parse_type_expression(field_type)
+        parse_type_expression(impl["return"])

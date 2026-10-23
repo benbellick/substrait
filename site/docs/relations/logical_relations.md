@@ -123,52 +123,36 @@ Points to an [Iceberg metadata file](https://iceberg.apache.org/spec/#table-meta
 
 ## Table Function
 
-The table function operator invokes a function that produces a relation (zero or more records).  These are leaf operators that take constant (non-relational) arguments and generate data.
+`TableFunctionRel` evaluates a `TableExpression` once in the current evaluation context and returns its generated rows. It is a leaf operator with no local input row. Arguments may be expressions rather than literals, and may use outer references when the relation appears in a correlated subquery.
 
-Like scalar function return types, table function schemas can be concrete types or reference type parameters from arguments. The schema is expressed as an `ExpressionNamedStruct` and is either derived from the function signature or must be explicitly provided when it depends on runtime data content. It is preferred to explicitly provide a schema derivation in the YAML file when possible.
+The relation wraps the shared `TableExpression.TableFunction` call rather than defining its own function reference, arguments, options, or output schema. A separate per-input-row operator can use the same callable representation while defining different evaluation and output-combination rules.
 
-Table functions can be **variadic**, meaning the last parameter can be repeated one or more times (specified via the `variadic` field in YAML).
-
-| Signature            | Value                                       |
-| -------------------- | ------------------------------------------- |
-| Inputs               | 0 (leaf operator)                           |
-| Outputs              | 1                                           |
+| Signature | Value |
+| --------- | ----- |
+| Inputs | 0 |
+| Outputs | 1 |
+| Property Maintenance | N/A (no inputs) |
+| Direct Output Order | Fields of the table expression's output struct, in positional order. |
 
 ### Table Function Properties
 
-| Property           | Description                                                  | Required |
-| ------------------ | ------------------------------------------------------------ | -------- |
-| Function Reference | Points to a function_anchor defined in the plan, referencing a table function in the extension YAML files | Required |
-| Arguments          | Constant expressions to pass as arguments to the function. Must match the function signature exactly. Must be literals or expressions that can be evaluated without input data. | Required |
-| Table Schema       | The output schema (NamedStruct). Always present. **Must match YAML definition (with type parameters resolved) when YAML defines a `return` field.** | Required |
+| Property | Description | Required |
+| -------- | ----------- | -------- |
+| Table Expression | The shared table expression to evaluate. The function call declares a concrete, non-nullable struct `output_type`, even when its YAML implementation omits `return`. | Required |
+
+The output fields may have optional name hints in `RelCommon.hint.output_names`; names are not part of the function's output type. Function arguments, options, and schema determination follow the shared [Table Functions](../expressions/table_functions.md) contract.
 
 ### Use Cases
 
-Common examples of table functions include:
-- `generate_series`: Generate sequences of numbers
-- `unnest`: Expand one to four lists into rows using fixed-arity overloads, with one output column per list
+The `generate_series` function generates a sequence of numbers. The fixed-arity `unnest` overloads expand one to four lists in parallel, with one output column per list.
 
 ### Example
 
-Generate a series of integers from 1 to 100:
+Generate integers from 1 to 100 using `generate_series:i64_i64_i64`. Function anchor 1 refers to that overload in the `functions_table` extension.
 
+```protobuf
+--8<-- "examples/proto-textformat/table_function_rel/generate_series.textproto"
 ```
-TableFunctionRel {
-  function_reference: <generate_series>
-  arguments: [
-    { value: { literal: { i64: 1 } } },
-    { value: { literal: { i64: 100 } } }
-  ]
-  table_schema: {
-    names: ["value"]
-    struct: {
-      types: [{ i64: {} }]
-    }
-  }
-}
-```
-
-See [Table Functions](../expressions/table_functions.md) for detailed documentation.
 
 === "TableFunctionRel Message"
 

@@ -1,0 +1,26 @@
+common {
+  direct {}
+  hint { output_names: "element" }
+}
+table_expression {
+  table_function {
+    function_reference: 1
+    arguments {
+      value {
+        literal {
+          list {
+            values { string: "apple" }
+            values { string: "banana" }
+            values { string: "cherry" }
+          }
+        }
+      }
+    }
+    output_type {
+      struct {
+        types { string { nullability: NULLABILITY_REQUIRED } }
+        nullability: NULLABILITY_REQUIRED
+      }
+    }
+  }
+}

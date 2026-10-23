@@ -404,12 +404,12 @@ $defs:
               $ref: "#/$defs/variadicBehavior"
             nullability:
               $ref: "#/$defs/nullabilityHandling"
+            options:
+              $ref: "#/$defs/options"
             return:
-              # The output schema (DerivationExpression, typically ExpressionNamedStruct).
-              # This can be a static struct definition or a dynamic derivation based on
-              # argument types (e.g., type-parameterized functions).
-              # Omit this field only if the schema depends on runtime data content
-              # (not determinable from function signature).
-              $ref: "#/$defs/type"
+              # The output row type must resolve to a non-nullable struct.
+              # Omit when the producer determines the schema from argument values
+              # or external information instead of a YAML type expression.
+              $ref: "#/$defs/returnValue"
             implementation:
               $ref: "#/$defs/implementation"
