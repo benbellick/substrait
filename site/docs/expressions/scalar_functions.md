@@ -10,7 +10,7 @@ A function is a scalar function if that function takes in values from a single r
 | Session Dependent      | Whether this function is influenced by the session context it is invoked within. For example, a function may be influenced by a user who is invoking the function, the time zone of a session, or some other non-obvious parameter. This can inform caching systems on whether a particular function is cacheable.                                                                                    | Optional, defaults to false.        |
 | Variadic Behavior      | Whether the last argument of the function is variadic or a single argument.  If variadic, the argument can optionally have a lower bound (minimum number of instances) and an upper bound (maximum number of instances).                                                                                                                                                                              | Optional, defaults to single value. |
 | Nullability Handling | Describes how nullability of input arguments maps to nullability of output arguments. Three options are: `MIRROR`, `DECLARED_OUTPUT` and `DISCRETE`. More details about nullability handling are listed below.                                                                                                                                                                                        | Optional, defaults to `MIRROR` |
-| Description            | Additional description of function for implementers or users. Should be written human-readable to allow exposure to end users. Presented as a map with language => description mappings. E.g. `{ "en": "This adds two numbers together.", "fr": "cela ajoute deux nombres"}`.                                                                                                                         | Optional                            |
+| Description            | Additional description of function for implementers or users. Should be written human-readable to allow exposure to end users. Can be specified at the function level and/or on individual implementations to document overload-specific behavior.                                                                                                                         | Optional                            |
 | Return Value | The output type of the expression.  Return types can be expressed as a fully-defined type or a type expression. See below for more on type expressions.                                                                                                                                                                                                                                               | Required                            |
 | Implementation Map     | A map of implementation locations for one or more implementations of the given function. Each key is a function implementation type. Implementation types include examples such as: AthenaArrowLambda, TrinoV361Jar, ArrowCppKernelEnum, GandivaEnum, LinkedIn Transport Jar, etc. [Definition TBD]. Implementation type has one or more properties associated with retrieval of that implementation. | Optional                            |
 
@@ -18,11 +18,11 @@ A function is a scalar function if that function takes in values from a single r
 
 ## Argument Types
 
-There are three main types of arguments: value arguments, type arguments, and enumerations.  Every defined arguments must be specified in every invocation of the function.  When specified, the position of these arguments in the function invocation must match the position of the arguments as defined in the YAML function definition.
+There are three main types of arguments: value arguments, type arguments, and enumerations.  Every defined argument must be specified in every invocation of the function.  When specified, the position of these arguments in the function invocation must match the position of the arguments as defined in the YAML function definition.
 
 * Value arguments: arguments that refer to a data value. These could be constants (literal expressions defined in the plan) or variables (a reference expression that references data being processed by the plan). This is the most common type of argument. The value of a value argument is not available in output derivation, but its type is. Value arguments can be declared in one of two ways: concrete or parameterized. Concrete types are either simple types or compound types with all parameters fully defined (without referencing any type arguments). Examples include `i32`, `fp32`, `VARCHAR<20>`, `List<fp32>`, etc. Parameterized types are discussed further below.
 * Type arguments: arguments that are used only to inform the evaluation and/or type derivation of the function. For example, you might have a function which is `truncate(<type> DECIMAL<P0,S0>, <value> DECIMAL<P1, S1>, <value> i32)`. This function declares two value arguments and a type argument. The difference between them is that the type argument has no value at runtime, while the value arguments do.
-* Enumeration: arguments that support a fixed set of declared values as constant arguments. These arguments must be specified as part of an expression. While these could also have been implemented as constant string value arguments, they are formally included to improve validation/contextual help/etc. for frontend processors and IDEs. An example might be `extract([DAY|YEAR|MONTH], <date value>)`. In this example, a producer must specify a type of date part to extract. Note, the value of a required enumeration cannot be used in type derivation.
+* Enumeration: arguments that require the caller to specify exactly one value from a fixed set of declared string values. They represent choices that are integral to the function's core semantics. An example is `extract([DAY|YEAR|MONTH], <date value>)`, where the caller must specify which date part to extract. Note, the value of an enumeration argument cannot be used in type derivation.
 
 #### Value Argument Properties
 
@@ -41,7 +41,7 @@ There are three main types of arguments: value arguments, type arguments, and en
 | Name        | A human-readable name for this argument to help clarify use.        | Optional, defaults to a name based on position (e.g. `arg0`) |
 | Description | Additional description of this argument.                            | Optional                                                   |
 
-#### Required Enumeration Properties
+#### Enumeration Argument Properties
 
 | Property    | Description                                                   | Required                                                     |
 | ----------- | ------------------------------------------------------------- | ------------------------------------------------------------ |
@@ -49,34 +49,110 @@ There are three main types of arguments: value arguments, type arguments, and en
 | Name        | A human-readable name for this argument to help clarify use.  | Optional, defaults to a name based on position (e.g. `arg0`) |
 | Description | Additional description of this argument.                      | Optional                                                     |
 
+Explicit argument names must be unique within a function implementation.
+
 ## Options
 
-In addition to arguments each call may specify zero or more options.  These are similar to a required enumeration but more focused on supporting alternative behaviors. Options can be left unspecified and the consumer is free to choose which implementation to use. An example use case might be `OVERFLOW_BEHAVIOR:[OVERFLOW, SATURATE, ERROR]` If unspecified, an engine is free to use any of the three choices or even some alternative behavior (e.g. setting the value to null on overflow). If specified, the engine would be expected to behave as specified or fail. Note, the value of an optional enumeration cannot be used in type derivation.
+In addition to arguments, each function call may specify zero or more options. Options allow a producer to express preferences about how a consumer handles corner cases or engine-specific behavior. Unlike enumeration arguments, options are not required. If a producer omits an option, the consumer is free to choose any supported behavior. Options are named (not positional) and are not part of the function signature. See [Enumeration Arguments vs Options](#enumeration-arguments-vs-options) for a detailed comparison.
+
+An example is `OVERFLOW_BEHAVIOR:[OVERFLOW, SATURATE, ERROR]`. If unspecified, the engine is free to use any of the three choices or even some alternative behavior (e.g. setting the value to null on overflow). If specified, the engine would be expected to behave as specified or reject the plan. Note, the value of an option cannot be used in type derivation.
 
 ### Option Preference
 
 A producer may specify multiple values for an option.  If the producer does so then the consumer must deliver the first behavior in the list of values that the consumer is capable of delivering.  For example, considering overflow as defined above, if a producer specified `[ERROR, SATURATE]` then the consumer must deliver `ERROR` if it is capable of doing so.  If it is not then it may deliver `SATURATE`.  If the consumer cannot deliver either behavior then it is an error and the consumer must reject the plan.
 
-#### Optional Properties
+#### Option Properties
 
 | Property | Description                              | Required |
 | -------- | ---------------------------------------- | -------- |
 | Values   | A list of valid strings for this option. | Required |
 | Name     | A human-readable name for this option.   | Required |
 
+### Enumeration Arguments vs Options
+
+Both enumeration arguments and options accept values from a fixed set of strings, but they serve different purposes. As a general rule, prefer enumeration arguments for anything the caller must decide for the function to be meaningful. Options are best suited for engine-level behavioral properties (like overflow or rounding mode) where a reasonable default exists and the caller may not care which behavior the engine picks.
+
+| | Enumeration Argument | Option |
+| --- | --- | --- |
+| Required? | Yes, must be specified by the producer | No, may be omitted |
+| Semantics | Core to the function's operation (e.g., which date component to extract) | Behavioral preference for corner cases or engine-specific behavior (e.g., overflow handling) |
+| Position | Positional, part of the argument list | Named, separate from arguments |
+| In function signature? | Yes (as `req`) | No |
+| If omitted | Invalid plan | Consumer chooses its own behavior |
+
+!!! warning "YAML keyword overlap"
+
+    In the YAML extension format, both enumeration arguments and function-level options use the keyword `options`. An enumeration argument appears inside `args` as `options: [VAL1, VAL2, ...]`, while a function-level option appears under a top-level `options` key with named sub-keys and a `values` list. Take care not to confuse the two when reading or writing extension YAML files.
+
+    ```yaml
+    args:
+      - name: component
+        options: [YEAR, MONTH, DAY] # enumeration argument
+      - name: x
+        value: precision_timestamp<6>
+    ```
+
+    ```yaml
+    options: # function-level options
+      overflow:
+        values: [SILENT, SATURATE, ERROR]
+    ```
 
 
-### Nullability Handling
+
+## Nullability Handling
 
 | Mode            | Description                                                  |
 | --------------- | ------------------------------------------------------------ |
-| MIRROR          | This means that the function has the behavior that if at least one of the input arguments are nullable, the return type is also nullable. If all arguments are non-nullable, the return type will be non-nullable.  An example might be the `+` function. |
-| DECLARED_OUTPUT | Input arguments are accepted of any mix of nullability. The nullability of the output function is whatever the return type expression states. Example use might be the function `is_null()` where the output is always `boolean` independent of the nullability of the input. |
-| DISCRETE        | The input and arguments all define concrete nullability and can only be bound to the types that have those nullability. For example, if a type input is declared `i64?` and one has an `i64` literal, the `i64` literal must be specifically cast to `i64?` to allow the operation to bind. |
+| `MIRROR`          | This means that the function has the behavior that if at least one of the input arguments are nullable, the return type is also nullable. If all arguments are non-nullable, the return type will be non-nullable. An implementation that declares no arguments therefore has a non-nullable return type, since there are no nullable inputs to propagate. Since the nullability of the output is determined by the nullability of the inputs, argument types and return types must not include nullability markers (`?`). The function binds regardless of argument nullability. An example of a function with `MIRROR` nullability is the `add` function. |
+| `DECLARED_OUTPUT` | This means that the function accepts input arguments of any nullability. The nullability of the output is determined solely by the return type expression. Since the nullability of the inputs is not considered, argument types must not include nullability markers (`?`). The function binds regardless of argument nullability. An example of a function with `DECLARED_OUTPUT` nullability is the `is_null()` function where the output is always `boolean` independent of the nullability of the input. |
+| `DISCRETE`        | `DISCRETE` nullability extends `DECLARED_OUTPUT`. The output nullability must still match the return type expression's nullability. Additionally, the input and arguments all define concrete nullabilities and can only be bound to the types that have those nullabilities. For example, if a type input is declared as `i64?` and one has an `i64` literal, the `i64` literal must be cast to `i64?` to allow the operation to bind. |
 
+### Nullability and `any` Type Binding
 
+The nullability mode also determines how [`any` types](../extensions/index.md#any-types) bind to concrete argument types. All type components except the outermost nullability must match structurally.
 
-### Parameterized Types
+- With `MIRROR` or `DECLARED_OUTPUT`, the outermost nullability of each argument is stripped before binding. It is only used to [determine the output nullability](#nullability-handling). These modes do not allow nullable parameters in the signature.
+- With `DISCRETE`, the outermost nullability of each argument must match the nullability declared at the corresponding position in the signature. For example, `fn(any1, any1?)` requires a non-nullable first argument and a nullable second argument.
+
+Detailed examples for both [concrete types](#concrete-types) and [`any` type binding](#any-type-binding) follow below.
+
+### Nullability Binding Examples
+
+#### Concrete Types
+
+[`add`](https://github.com/substrait-io/substrait/blob/main/extensions/functions_arithmetic.yaml#:~:text=%2D-,name%3A%20%22add%22,-description%3A%20%22Add%20two) is declared as `add(i32, i32) -> i32` with `MIRROR` nullability. `add(i32?, i32)`, `add(i32, i32?)`, and `add(i32?, i32?)` all return `i32?` because at least one argument is nullable, but `add(i32, i32)` returns `i32` because all arguments are non-nullable.
+
+[`is_null`](https://github.com/substrait-io/substrait/blob/main/extensions/functions_comparison.yaml#:~:text=%2D-,name%3A%20%22is_null%22,-description%3A%20Whether) is declared as `is_null(i64) -> boolean` with `DECLARED_OUTPUT` nullability. Both `is_null(i64)` and `is_null(i64?)` return `boolean` because the output type is determined solely by the declared return type regardless of input nullability.
+
+#### `any` Type Binding
+
+The following examples show how `any` type parameters bind across the different nullability modes. Note that only the outermost nullability is stripped for binding (and only under `MIRROR` or `DECLARED_OUTPUT`); nested nullability within compound types (e.g. `list<i32?>`) is preserved and must match structurally.
+
+| Definition | Nullability Handling | Invocation | Matches? | `any1` binds to | Returns | Reason |
+| --- | --- | --- | --- | --- | --- | --- |
+| `f(any1, any1) -> any1` | `MIRROR` | `f(i32, i32)` | Yes | `i32` | `i32` | Both arguments non-nullable; MIRROR keeps output non-nullable |
+| `f(any1, any1) -> any1` | `MIRROR` | `f(i32?, i32)` | Yes | `i32` | `i32?` | Outermost nullability stripped before binding; MIRROR propagates it to output |
+| `f(any1, any1) -> any1` | `MIRROR` | `f(i32, i32?)` | Yes | `i32` | `i32?` | Outermost nullability stripped before binding; MIRROR propagates it to output |
+| `f(any1, any1) -> any1` | `MIRROR` | `f(i32?, i32?)` | Yes | `i32` | `i32?` | Outermost nullability stripped from both before binding; MIRROR propagates it to output |
+| `h(list<any1>, list<any1>) -> list<any1>` | `MIRROR` | `h(list<i32>, list<i32>)` | Yes | `i32` | `list<i32>` | Both args non-nullable; outer list stays non-nullable under MIRROR |
+| `h(list<any1>, list<any1>) -> list<any1>` | `MIRROR` | `h(list?<i32>, list<i32>)` | Yes | `i32` | `list?<i32>` | Outermost nullability stripped before binding; MIRROR propagates it to output |
+| `h(list<any1>, list<any1>) -> list<any1>` | `MIRROR` | `h(list<i32?>, list<i32?>)` | Yes | `i32?` | `list<i32?>` | Inner nullability is not stripped; both args agree so `any1` binds to `i32?` |
+| `h(list<any1>, list<any1>) -> list<any1>` | `MIRROR` | `h(list<i32>, list<i32?>)` | No | | | Inner nullability is not stripped; `list<i32>` and `list<i32?>` are structurally different |
+| `j(any1, list<any1?>) -> any1` | `MIRROR` | `j(i32, list<i32?>)` | Yes | `i32` | `i32` | Type variables can bind across structurally different arguments; second arg element type `i32?` matches `any1?` |
+| `j(any1, list<any1?>) -> any1` | `MIRROR` | `j(i32, list<i32>)` | No | | | Second arg element type `i32` doesn't match `any1?` (requires nullable element) |
+| `j(any1, list<any1?>) -> any1` | `MIRROR` | `j(i32, list<fp64?>)` | No | | | `any1` binds to `i32` from the first arg but second arg element type `fp64?` doesn't match `i32?` |
+| `d(any1, any1) -> any1?` | `DECLARED_OUTPUT` | `d(i32, i32)` | Yes | `i32` | `i32?` | Both arguments non-nullable; output nullability comes from the signature (`any1?`) |
+| `d(any1, any1) -> any1?` | `DECLARED_OUTPUT` | `d(i32?, i32)` | Yes | `i32` | `i32?` | Outermost nullability stripped before binding; output nullability still comes from the signature |
+| `d(any1, any1) -> any1?` | `DECLARED_OUTPUT` | `d(i32?, i32?)` | Yes | `i32` | `i32?` | Outermost nullability stripped from both before binding; output nullability still comes from the signature |
+| `g(any1, any1) -> any1` | `DISCRETE` | `g(i32, i32)` | Yes | `i32` | `i32` | Matches signature exactly; both arguments non-nullable |
+| `g(any1, any1) -> any1` | `DISCRETE` | `g(i32?, i32?)` | No | | | Both arguments are nullable but signature requires non-nullable |
+| `g(any1, any1) -> any1` | `DISCRETE` | `g(i32, i32?)` | No | | | Second argument is nullable but signature requires non-nullable |
+| `g2(any1, any1?) -> any1?` | `DISCRETE` | `g2(i32, i32?)` | Yes | `i32` | `i32?` | Matches declared outer nullabilities (non-nullable, nullable); return type is `any1?` = `i32?` |
+| `g2(any1, any1?) -> any1?` | `DISCRETE` | `g2(i32, i32)` | No | | | Second argument is non-nullable but signature requires nullable |
+| `g2(any1, any1?) -> any1?` | `DISCRETE` | `g2(i32?, i32?)` | No | | | First argument is nullable but signature requires non-nullable |
+
+## Parameterized Types
 
 Types are parameterized by two types of values: by inner types (e.g. `List<K>`) and numeric values (e.g. `DECIMAL<P,S>`). Parameter names are simple strings (frequently a single character). There are two types of parameters: integer parameters and type parameters.
 
@@ -106,10 +182,49 @@ These types are evaluated using a small set of operations to support common scen
 
 ```
 Math: +, -, *, /, min, max
-Boolean: &&, ||, !, <, >, ==
+Boolean: AND, OR, !
+Comparison: <, >, <=, >=, =, !=
+Conditional: if ... then ... else ..., ... ? ... : ...
 Parameters: type, integer
 Literals: type, integer
 ```
+
+`AND` and `OR` are keywords, and all keywords in a type expression are case-insensitive. Note that the boolean operators are spelled `AND`, `OR` and `!`, and equality is spelled `=` and `!=` -- not `&&`, `||` or `==`.
+
+#### Operator Precedence
+
+Sub-expressions may be grouped with parentheses, and grouping always takes precedence over the table below. Without parentheses, operators bind in this order:
+
+| Precedence | Operators | Associativity |
+| ---------- | --------- | ------------- |
+| 1 (tightest) | grouping `( )`, function call `f(...)` | n/a |
+| 2 | `!` | right (unary prefix) |
+| 3 | `*` `/` | left |
+| 4 | `+` `-` | left |
+| 5 | `<` `>` `<=` `>=` | left |
+| 6 | `=` `!=` | left |
+| 7 | `AND` | left |
+| 8 | `OR` | left |
+| 9 | `if ... then ... else ...` | right |
+| 10 (loosest) | `... ? ... : ...` | right |
+
+See [`grammar/SubstraitType.g4`](https://github.com/substrait-io/substrait/blob/main/grammar/SubstraitType.g4) for the formal grammar.
+
+##### Examples
+
+| Expression | Binds as |
+| ---------- | -------- |
+| `P - S + 1` | `(P - S) + 1` |
+| `S1 + P2 * 2` | `S1 + (P2 * 2)` |
+| `!a AND b` | `(!a) AND b` |
+| `c1 ? 1 : c2 ? 2 : 3` | `c1 ? 1 : (c2 ? 2 : 3)` |
+| `if a then b else if c then d else e` | `if a then b else (if c then d else e)` |
+| `if a ? b : c then d else e` | `if (a ? b : c) then d else e` |
+| `if a then b ? c : d else e` | `if a then (b ? c : d) else e` |
+| `a ? b ? c : d : e` | `a ? (b ? c : d) : e` |
+| `if a then b else c ? d : e` | `(if a then b else c) ? d : e` |
+| `if a then b else c AND d` | `if a then b else (c AND d)` |
+| `x AND if a then b else c` | `x AND (if a then b else c)` |
 
 Fully defined with argument types:
 

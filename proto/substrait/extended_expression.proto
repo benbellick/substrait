@@ -25,13 +25,11 @@ message ExpressionReference {
 // Describe a set of operations to complete.
 // For compactness sake, identifiers are normalized at the plan level.
 message ExtendedExpression {
+  reserved 1;
+
   // Substrait version of the expression. Optional up to 0.17.0, required for later
   // versions.
   Version version = 7;
-
-  // a list of yaml specifications this expression may depend on
-  // this is now deprecated and extension_urns should be used instead.
-  repeated substrait.extensions.SimpleExtensionURI extension_uris = 1 [deprecated = true];
 
   // a list of extension specifications this expression may depend on,
   // referenced by Extension URN
@@ -53,4 +51,14 @@ message ExtendedExpression {
   // unused. In many cases, a consumer may be able to work with a plan even if
   // one or more message types defined here are unknown.
   repeated string expected_type_urls = 6;
+
+  // Expression subtrees stored separately to reduce protobuf nesting.
+  // Referenced by zero-based ordinals local to this ExtendedExpression.
+  // See https://substrait.io/serialization/binary_serialization/#detached-relations-and-expressions.
+  repeated Expression detached_expressions = 9;
+
+  // Relation subtrees stored separately to reduce protobuf nesting.
+  // Referenced by zero-based ordinals local to this ExtendedExpression.
+  // See https://substrait.io/serialization/binary_serialization/#detached-relations-and-expressions.
+  repeated Rel detached_rels = 10;
 }

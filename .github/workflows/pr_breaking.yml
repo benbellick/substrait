@@ -3,20 +3,27 @@ name: Breaking Changes Check
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
+
+# `buf breaking` reads the base branch over public HTTPS and the PR description
+# comes from the event payload, so no API access is needed.
+permissions:
+  contents: read
+
 jobs:
   breaking:
     name: Ensure breaking changes are labeled in description
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: bufbuild/buf-setup-action@v1.50.0
+      - uses: actions/checkout@v7
+      - uses: prefix-dev/setup-pixi@v0.10.2
         with:
-          github_token: ${{ github.token }}
+          pixi-version: v0.81.0
+          cache: true
       - name: check for breaking changes
         id: check-breaking
         run: |
 
-          if ! buf breaking --against 'https://github.com/substrait-io/substrait.git#branch=main'; then
+          if ! pixi run buf breaking --against 'https://github.com/substrait-io/substrait.git#branch=main'; then
             breaking="true"
           else
             breaking="false"

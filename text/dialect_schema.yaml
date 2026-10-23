@@ -12,6 +12,9 @@ properties:
   name:
     type: string
     description: Optional name of the dialect (e.g., "MySQL", "PostgreSQL", "Spark").
+  metadata:
+    type: object
+    description: Arbitrary data created by the dialect author.
   dependencies:
     type: object
     description: >
@@ -47,15 +50,16 @@ properties:
           - PRECISION_TIMESTAMP
           - PRECISION_TIMESTAMP_TZ
           - DATE
-          - TIME
           - INTERVAL_COMPOUND
           - INTERVAL_DAY
           - INTERVAL_YEAR
           - UUID
+          - UNBOUND
           - DECIMAL
           - STRUCT
           - LIST
           - MAP
+          - FUNC
         - $ref: "#/definitions/type_bool"
         - $ref: "#/definitions/type_i8"
         - $ref: "#/definitions/type_i16"
@@ -72,15 +76,16 @@ properties:
         - $ref: "#/definitions/type_precision_timestamp"
         - $ref: "#/definitions/type_precision_timestamp_tz"
         - $ref: "#/definitions/type_date"
-        - $ref: "#/definitions/type_time"
         - $ref: "#/definitions/type_interval_compound"
         - $ref: "#/definitions/type_interval_day"
         - $ref: "#/definitions/type_interval_year"
         - $ref: "#/definitions/type_uuid"
+        - $ref: "#/definitions/type_unbound"
         - $ref: "#/definitions/type_decimal"
         - $ref: "#/definitions/type_struct"
         - $ref: "#/definitions/type_list"
         - $ref: "#/definitions/type_map"
+        - $ref: "#/definitions/type_func"
         - $ref: "#/definitions/type_user_defined"
 
   supported_relations:
@@ -98,6 +103,7 @@ properties:
           - AGGREGATE
           - SORT
           - JOIN
+          - LATERAL_JOIN
           - PROJECT
           - SET
           - CROSS
@@ -111,12 +117,14 @@ properties:
           - CONSISTENT_PARTITION_WINDOW
           - EXCHANGE
           - EXPAND
+          - TOP_N
         - $ref: "#/definitions/read_relation"
         - $ref: "#/definitions/filter_relation"
         - $ref: "#/definitions/fetch_relation"
         - $ref: "#/definitions/aggregate_relation"
         - $ref: "#/definitions/sort_relation"
         - $ref: "#/definitions/join_relation"
+        - $ref: "#/definitions/lateral_join_relation"
         - $ref: "#/definitions/project_relation"
         - $ref: "#/definitions/set_relation"
         - $ref: "#/definitions/extension_single_relation"
@@ -133,13 +141,17 @@ properties:
         - $ref: "#/definitions/consistent_partition_window_relation"
         - $ref: "#/definitions/exchange_relation"
         - $ref: "#/definitions/expand_relation"
+        - $ref: "#/definitions/top_n_relation"
 
   supported_expressions:
     type: array
     uniqueItems: true
     description: >
       Expressions that are supported by this dialect.  If not present or empty,
-      all expressions are supported.
+      all expressions are supported, including both inline and named lambda
+      invocations. In a non-empty list, LAMBDA_INVOCATION supports inline
+      callees; named callees require both LAMBDA_INVOCATION and
+      NAMED_LAMBDA_REFERENCE.
     items:
       oneOf:
         - enum:
@@ -155,6 +167,10 @@ properties:
           - SUBQUERY
           - NESTED
           - DYNAMIC_PARAMETER
+          - LAMBDA
+          - LAMBDA_INVOCATION
+          - EXECUTION_CONTEXT_VARIABLE
+          - NAMED_LAMBDA_REFERENCE
         - $ref: "#/definitions/literal_expression"
         - $ref: "#/definitions/selection_expression"
         - $ref: "#/definitions/scalar_function_expression"
@@ -167,6 +183,10 @@ properties:
         - $ref: "#/definitions/subquery_expression"
         - $ref: "#/definitions/nested_expression"
         - $ref: "#/definitions/dynamic_parameter_expression"
+        - $ref: "#/definitions/lambda_expression"
+        - $ref: "#/definitions/lambda_invocation_expression"
+        - $ref: "#/definitions/execution_context_variable"
+        - $ref: "#/definitions/named_lambda_reference_expression"
 
   supported_scalar_functions:
     type: array
@@ -184,6 +204,28 @@ properties:
     items:
       $ref: "#/definitions/dialect_function"
 
+  supported_execution_behavior:
+    type: object
+    additionalProperties: false
+    properties:
+      supported_variable_evaluation_mode:
+        type: array
+        uniqueItems: true
+        items:
+          oneOf:
+            - enum:
+              - PER_PLAN
+              - PER_RECORD
+        description: >
+          Supported execution context variable evaluation modes:
+          * PER_PLAN: Variables are evaluated once per Substrait plan
+            execution. All records in a single plan execution will see the
+            same values for execution context variables like `current_date`
+            and `current_timestamp`.
+          * PER_RECORD: Variables are evaluated once per record during
+            execution. Each record may see different values for execution
+            context variables if the execution context changes between records.
+
 definitions:
   # Definitions used for functions
   dialect_function:
@@ -198,6 +240,9 @@ definitions:
         type: string
         description: >
           The name of the function as declared in the extension it is defined in.
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       system_metadata:
         type: object
         description: system specific metadata for the function
@@ -212,7 +257,11 @@ definitions:
         type: array
         description: >
           List of one or more implementations supported by this function. Use
-          argument signatures to identify the implementations.
+          argument signatures to identify the implementations. An implementation
+          that takes no arguments has an empty argument signature and is
+          identified by the empty string. For example, ["i64", ""] identifies
+          two implementations: one taking a single i64 argument, and one taking
+          no arguments.
         minItems: 1
         items:
           type: string
@@ -266,6 +315,9 @@ definitions:
     type: object
     description: Dialect properties shared by all types
     properties:
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       system_metadata:
         type: object
         description: system specific metadata for the type
@@ -294,6 +346,9 @@ definitions:
     properties:
       type:
         const: BOOL
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       system_metadata:
         $ref: "#/definitions/system_type_metadata"
   type_i8:
@@ -303,6 +358,9 @@ definitions:
     properties:
       type:
         const: I8
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       system_metadata:
         $ref: "#/definitions/system_type_metadata"
   type_i16:
@@ -312,6 +370,9 @@ definitions:
     properties:
       type:
         const: I16
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       system_metadata:
         $ref: "#/definitions/system_type_metadata"
   type_i32:
@@ -321,6 +382,9 @@ definitions:
     properties:
       type:
         const: I32
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       system_metadata:
         $ref: "#/definitions/system_type_metadata"
   type_i64:
@@ -330,6 +394,9 @@ definitions:
     properties:
       type:
         const: I64
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       system_metadata:
         $ref: "#/definitions/system_type_metadata"
   type_fp32:
@@ -339,6 +406,9 @@ definitions:
     properties:
       type:
         const: FP32
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       system_metadata:
         $ref: "#/definitions/system_type_metadata"
   type_fp64:
@@ -348,6 +418,9 @@ definitions:
     properties:
       type:
         const: FP64
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       system_metadata:
         $ref: "#/definitions/system_type_metadata"
   type_binary:
@@ -357,6 +430,9 @@ definitions:
     properties:
       type:
         const: BINARY
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       system_metadata:
         $ref: "#/definitions/system_type_metadata"
   type_fixed_binary:
@@ -366,8 +442,22 @@ definitions:
     properties:
       type:
         const: FIXED_BINARY
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       system_metadata:
         $ref: "#/definitions/system_type_metadata"
+      max_length:
+        description: >-
+          The maximum length for the FIXED_BINARY data type supported by this
+          dialect.
+
+          Since the maximum length in Substrait for FIXED_BINARY is
+          2,147,483,647 the value must be in range: 0 <= max_length <=
+          2,147,483,647.
+        type: integer
+        minimum: 0
+        maximum: 2147483647
   type_string:
     type: object
     additionalProperties: false
@@ -375,6 +465,9 @@ definitions:
     properties:
       type:
         const: STRING
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       system_metadata:
         $ref: "#/definitions/system_type_metadata"
   type_varchar:
@@ -384,8 +477,21 @@ definitions:
     properties:
       type:
         const: VARCHAR
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       system_metadata:
         $ref: "#/definitions/system_type_metadata"
+      max_length:
+        description: >-
+          The maximum length for the VARCHAR data type supported by this
+          dialect.
+
+          Since the maximum length in Substrait for VARCHAR is 2,147,483,647
+          the value must be in range: 0 <= max_length <= 2,147,483,647.
+        type: integer
+        minimum: 0
+        maximum: 2147483647
   type_fixed_char:
     type: object
     additionalProperties: false
@@ -393,35 +499,87 @@ definitions:
     properties:
       type:
         const: FIXED_CHAR
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       system_metadata:
         $ref: "#/definitions/system_type_metadata"
+      max_length:
+        description: >-
+          The maximum length for the FIXED_CHAR data type supported by this
+          dialect.
+
+          Since the maximum length in Substrait for FIXED_CHAR is 2,147,483,647
+          the value must be in range: 0 <= max_length <= 2,147,483,647.
+        type: integer
+        minimum: 0
+        maximum: 2147483647
   type_precision_time:
     type: object
     additionalProperties: false
-    required: [type]
+    required: [type, max_precision]
     properties:
       type:
         const: PRECISION_TIME
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       system_metadata:
         $ref: "#/definitions/system_type_metadata"
+      max_precision:
+        description: >-
+          The maximum subsecond precision for the PRECISION_TIME data type
+          supported by this dialect.
+
+          Since the maximum precision in Substrait for PRECISION_TIME is 12
+          the value must be in range: 0 <= max_precision <= 12.
+        type: integer
+        minimum: 0
+        maximum: 12
   type_precision_timestamp:
     type: object
     additionalProperties: false
-    required: [type]
+    required: [type, max_precision]
     properties:
       type:
         const: PRECISION_TIMESTAMP
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       system_metadata:
         $ref: "#/definitions/system_type_metadata"
+      max_precision:
+        description: >-
+          The maximum subsecond precision for the PRECISION_TIMESTAMP data type
+          supported by this dialect.
+
+          Since the maximum precision in Substrait for PRECISION_TIMESTAMP is
+          12 the value must be in range: 0 <= max_precision <= 12.
+        type: integer
+        minimum: 0
+        maximum: 12
   type_precision_timestamp_tz:
     type: object
     additionalProperties: false
-    required: [type]
+    required: [type, max_precision]
     properties:
       type:
         const: PRECISION_TIMESTAMP_TZ
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       system_metadata:
         $ref: "#/definitions/system_type_metadata"
+      max_precision:
+        description: >-
+          The maximum subsecond precision for the PRECISION_TIMESTAMP_TZ data
+          type supported by this dialect.
+
+          Since the maximum precision in Substrait for PRECISION_TIMESTAMP_TZ is
+          12 the value must be in range: 0 <= max_precision <= 12.
+        type: integer
+        minimum: 0
+        maximum: 12
   type_date:
     type: object
     additionalProperties: false
@@ -429,35 +587,56 @@ definitions:
     properties:
       type:
         const: DATE
-      system_metadata:
-        $ref: "#/definitions/system_type_metadata"
-  type_time:
-    type: object
-    additionalProperties: false
-    required: [type]
-    properties:
-      type:
-        const: TIME
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       system_metadata:
         $ref: "#/definitions/system_type_metadata"
   type_interval_compound:
     type: object
     additionalProperties: false
-    required: [type]
+    required: [type, max_precision]
     properties:
       type:
         const: INTERVAL_COMPOUND
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       system_metadata:
         $ref: "#/definitions/system_type_metadata"
+      max_precision:
+        description: >-
+          The maximum subsecond precision for the INTERVAL_COMPOUND data type
+          supported by this dialect.
+
+          Since the maximum precision in Substrait for INTERVAL_COMPOUND is 12
+          the value must be in range: 0 <= max_precision <= 12.
+        type: integer
+        minimum: 0
+        maximum: 12
   type_interval_day:
     type: object
     additionalProperties: false
-    required: [type]
+    required: [type, max_precision]
     properties:
       type:
         const: INTERVAL_DAY
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       system_metadata:
         $ref: "#/definitions/system_type_metadata"
+      max_precision:
+        description: >-
+          The maximum subsecond precision for the INTERVAL_DAY data type
+          supported by this dialect.
+
+
+          Since the maximum precision in Substrait for INTERVAL_DAY is 12
+          the value must be in range: 0 <= max_precision <= 12.
+        type: integer
+        minimum: 0
+        maximum: 12
   type_interval_year:
     type: object
     additionalProperties: false
@@ -465,6 +644,9 @@ definitions:
     properties:
       type:
         const: INTERVAL_YEAR
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       system_metadata:
         $ref: "#/definitions/system_type_metadata"
   type_uuid:
@@ -474,6 +656,21 @@ definitions:
     properties:
       type:
         const: UUID
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
+      system_metadata:
+        $ref: "#/definitions/system_type_metadata"
+  type_unbound:
+    type: object
+    additionalProperties: false
+    required: [type]
+    properties:
+      type:
+        const: UNBOUND
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       system_metadata:
         $ref: "#/definitions/system_type_metadata"
   type_decimal:
@@ -483,8 +680,27 @@ definitions:
     properties:
       type:
         const: DECIMAL
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       system_metadata:
         $ref: "#/definitions/system_type_metadata"
+      max_precision:
+        description: >-
+          The maximum number of digits in the integer part of the decimal type
+          where (P, number of digits) <= 38 and scale (S, number of fractional
+          digits) 0 <= S <= P.
+        type: integer
+        minimum: 0
+        maximum: 38
+      max_scale:
+        description: >-
+          The maximum number of digits after the decimal point  of the decimal
+          type where (P, number of digits) <= 38 and scale (S, number of
+          fractional digits) 0 <= S <= P.
+        type: integer
+        minimum: 0
+        maximum: 38
   type_struct:
     type: object
     additionalProperties: false
@@ -492,6 +708,9 @@ definitions:
     properties:
       type:
         const: STRUCT
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       system_metadata:
         $ref: "#/definitions/system_type_metadata"
   type_list:
@@ -501,6 +720,9 @@ definitions:
     properties:
       type:
         const: LIST
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       system_metadata:
         $ref: "#/definitions/system_type_metadata"
   type_map:
@@ -510,6 +732,21 @@ definitions:
     properties:
       type:
         const: MAP
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
+      system_metadata:
+        $ref: "#/definitions/system_type_metadata"
+  type_func:
+    type: object
+    additionalProperties: false
+    required: [type]
+    properties:
+      type:
+        const: FUNC
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       system_metadata:
         $ref: "#/definitions/system_type_metadata"
   type_user_defined:
@@ -526,6 +763,9 @@ definitions:
         type: string
         description: >
           The name of the type as declared in the extension it is defined in.
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       system_metadata:
         $ref: "#/definitions/system_type_metadata"
 
@@ -548,12 +788,27 @@ definitions:
         - RIGHT_SINGLE
         - LEFT_MARK
         - RIGHT_MARK
+  lateral_join_types:
+    type: array
+    uniqueItems: true
+    description: The list of possible join types used by lateral join relations.
+    items:
+      enum:
+        - INNER
+        - LEFT
+        - LEFT_SEMI
+        - LEFT_ANTI
+        - LEFT_SINGLE
+        - LEFT_MARK
   read_relation:
     type: object
     additionalProperties: false
     properties:
       relation:
         const: READ
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       read_types:
         type: array
         uniqueItems: true
@@ -572,6 +827,9 @@ definitions:
     properties:
       relation:
         const: FILTER
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
     required: [relation]
   fetch_relation:
     type: object
@@ -579,6 +837,9 @@ definitions:
     properties:
       relation:
         const: FETCH
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
     required: [relation]
   aggregate_relation:
     type: object
@@ -586,6 +847,9 @@ definitions:
     properties:
       relation:
         const: AGGREGATE
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
     required: [relation]
   sort_relation:
     type: object
@@ -593,6 +857,9 @@ definitions:
     properties:
       relation:
         const: SORT
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
     required: [relation]
   join_relation:
     type: object
@@ -600,8 +867,23 @@ definitions:
     properties:
       relation:
         const: JOIN
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       join_types:
         $ref: "#/definitions/join_types"
+    required: [relation]
+  lateral_join_relation:
+    type: object
+    additionalProperties: false
+    properties:
+      relation:
+        const: LATERAL_JOIN
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
+      join_types:
+        $ref: "#/definitions/lateral_join_types"
     required: [relation]
   project_relation:
     type: object
@@ -609,6 +891,9 @@ definitions:
     properties:
       relation:
         const: PROJECT
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
     required: [relation]
   set_relation:
     type: object
@@ -616,6 +901,9 @@ definitions:
     properties:
       relation:
         const: SET
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       operations:
         type: array
         uniqueItems: true
@@ -637,54 +925,69 @@ definitions:
     properties:
       relation:
         const: EXTENSION_SINGLE
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       message_types:
         type: array
         uniqueItems: true
+        minItems: 1
         description: >
           The list of supported message types.  Use the URI (e.g.
           type.googleapis.com/google.profile.Person) that is related to the
           detail field.
         items:
           type: string
-    required: [relation]
+    required: [relation, message_types]
   extension_multi_relation:
     type: object
     additionalProperties: false
     properties:
       relation:
         const: EXTENSION_MULTI
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       message_types:
         type: array
         uniqueItems: true
+        minItems: 1
         description: >
           The list of supported message types.  Use the URI (e.g.
           type.googleapis.com/google.profile.Person) that is related to the
           detail field.
         items:
           type: string
-    required: [relation]
+    required: [relation, message_types]
   extension_leaf_relation:
     type: object
     additionalProperties: false
     properties:
       relation:
         const: EXTENSION_LEAF
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       message_types:
         type: array
         uniqueItems: true
+        minItems: 1
         description: >
           The list of supported message types.  Use the URI (e.g.
           type.googleapis.com/google.profile.Person) that is related to the
           detail field.
         items:
           type: string
-    required: [relation]
+    required: [relation, message_types]
   cross_relation:
     type: object
     additionalProperties: false
     properties:
       relation:
         const: CROSS
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
     required: [relation]
   reference_relation:
     type: object
@@ -692,6 +995,9 @@ definitions:
     properties:
       relation:
         const: REFERENCE
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
     required: [relation]
   write_relation:
     type: object
@@ -699,6 +1005,9 @@ definitions:
     properties:
       relation:
         const: WRITE
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       write_types:
         type: array
         uniqueItems: true
@@ -714,6 +1023,9 @@ definitions:
     properties:
       relation:
         const: DDL
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       write_types:
         type: array
         uniqueItems: true
@@ -729,6 +1041,9 @@ definitions:
     properties:
       relation:
         const: UPDATE
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
     required: [relation]
   hash_join_relation:
     type: object
@@ -736,6 +1051,9 @@ definitions:
     properties:
       relation:
         const: HASH_JOIN
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       join_types:
         $ref: "#/definitions/join_types"
     required: [relation]
@@ -745,6 +1063,9 @@ definitions:
     properties:
       relation:
         const: MERGE_JOIN
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       join_types:
         $ref: "#/definitions/join_types"
     required: [relation]
@@ -754,6 +1075,9 @@ definitions:
     properties:
       relation:
         const: NESTED_LOOP_JOIN
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       join_types:
         $ref: "#/definitions/join_types"
     required: [relation]
@@ -763,6 +1087,9 @@ definitions:
     properties:
       relation:
         const: CONSISTENT_PARTITION_WINDOW
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
     required: [relation]
   exchange_relation:
     type: object
@@ -770,6 +1097,9 @@ definitions:
     properties:
       relation:
         const: EXCHANGE
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       kinds:
         type: array
         uniqueItems: true
@@ -788,6 +1118,9 @@ definitions:
     properties:
       relation:
         const: EXPAND
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       field_types:
         type: array
         uniqueItems: true
@@ -795,7 +1128,17 @@ definitions:
         items:
           enum:
             - SWITCHING_FIELD
-            - CONSTANT_FIELD
+            - CONSISTENT_FIELD
+    required: [relation]
+  top_n_relation:
+    type: object
+    additionalProperties: false
+    properties:
+      relation:
+        const: TOP_N
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
     required: [relation]
 
   # Definitions used for expressions
@@ -805,6 +1148,9 @@ definitions:
     properties:
       expression:
         const: LITERAL
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       # Type restriction not needed as types are restricted explicitly by supported_types.
     required: [expression]
   selection_expression:
@@ -813,6 +1159,9 @@ definitions:
     properties:
       expression:
         const: SELECTION
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
     required: [expression]
   scalar_function_expression:
     type: object
@@ -820,6 +1169,9 @@ definitions:
     properties:
       expression:
         const: SCALAR_FUNCTION
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
     required: [expression]
   window_function_expression:
     type: object
@@ -827,6 +1179,9 @@ definitions:
     properties:
       expression:
         const: WINDOW_FUNCTION
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
     required: [expression]
   if_then_expression:
     type: object
@@ -834,6 +1189,9 @@ definitions:
     properties:
       expression:
         const: IF_THEN
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
     required: [expression]
   switch_expression:
     type: object
@@ -841,6 +1199,9 @@ definitions:
     properties:
       expression:
         const: SWITCH
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
     required: [expression]
   singular_or_list_expression:
     type: object
@@ -848,6 +1209,9 @@ definitions:
     properties:
       expression:
         const: SINGULAR_OR_LIST
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
     required: [expression]
   multi_or_list_expression:
     type: object
@@ -855,6 +1219,9 @@ definitions:
     properties:
       expression:
         const: MULTI_OR_LIST
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
     required: [expression]
   # embedded_function_expression not included due to insufficient proto support.
   cast_expression:
@@ -863,6 +1230,9 @@ definitions:
     properties:
       expression:
         const: CAST
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       failure_options:
         type: array
         uniqueItems: true
@@ -878,6 +1248,9 @@ definitions:
     properties:
       expression:
         const: SUBQUERY
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       subquery_types:
         type: array
         description: The possible subquery types for a subquery relation.
@@ -894,6 +1267,9 @@ definitions:
     properties:
       expression:
         const: NESTED
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
       nested_types:
         type: array
         description: The valid nested types.
@@ -909,4 +1285,62 @@ definitions:
     properties:
       expression:
         const: DYNAMIC_PARAMETER
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
+    required: [expression]
+  lambda_expression:
+    type: object
+    additionalProperties: false
+    properties:
+      expression:
+        const: LAMBDA
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
+    required: [expression]
+  lambda_invocation_expression:
+    type: object
+    additionalProperties: false
+    description: >
+      Support for invoking inline lambdas. When NAMED_LAMBDA_REFERENCE is also
+      supported, this includes invoking named lambdas through
+      LambdaInvocation.named_lambda.
+    properties:
+      expression:
+        const: LAMBDA_INVOCATION
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
+    required: [expression]
+  named_lambda_reference_expression:
+    type: object
+    additionalProperties: false
+    description: >
+      Support for named lambda references as function-valued expressions.
+      Combined with LAMBDA_INVOCATION, this also declares support for invoking
+      named lambdas. On its own, this does not imply support for the
+      LAMBDA_INVOCATION expression.
+    properties:
+      expression:
+        const: NAMED_LAMBDA_REFERENCE
+      metadata:
+        type: object
+        description: Arbitrary data created by the dialect author.
+    required: [expression]
+  execution_context_variable:
+    type: object
+    additionalProperties: false
+    properties:
+      expression:
+        const: EXECUTION_CONTEXT_VARIABLE
+      variable_types:
+        type: array
+        description: The possible execution context variable types.
+        items:
+          oneOf:
+            - enum:
+              - CURRENT_TIMESTAMP
+              - CURRENT_TIMEZONE
+              - CURRENT_DATE
     required: [expression]

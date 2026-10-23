@@ -18,57 +18,91 @@ To extend these items, developers can create one or more YAML files that describ
 This extension URN uses the format `extension:<OWNER>:<ID>`, where:
 
 - `OWNER` represents the organization or entity providing the extension and should follow [reverse domain name convention](https://en.wikipedia.org/wiki/Reverse_domain_name_notation) (e.g., `io.substrait`, `com.example`, `org.apache.arrow`) to prevent name collisions
-- `ID` is the specific identifier for the extension (e.g., `functions_arithmetic`, `custom_types`) 
+- `ID` is the specific identifier for the extension (e.g., `functions_arithmetic`, `custom_types`)
 
 The YAML file is constructed according to the [YAML Schema](https://github.com/substrait-io/substrait/blob/main/text/simple_extensions_schema.yaml). Each definition in the file corresponds to the YAML-based serialization of the relevant data structure. If a user only wants to extend one of these types of objects (e.g. types), a developer does not have to provide definitions for the other extension points.
 
-A Substrait plan can reference one or more YAML files via their extension URN. In the places where these entities are referenced, they will be referenced using an extension URN + name reference. The name scheme per type works as follows:
+An optional top-level `description` describes the extension as a whole. For files that define functions, the generated documentation page displays it above the function definitions.
+
+```yaml
+--8<-- "examples/extensions/described_functions.yaml"
+```
+
+A Substrait plan can reference one or more YAML files via their extension URN. In the places where these entities are referenced, they will be referenced using an extension URN + name reference. Each extension entity (type, type variation, or function) is assigned an anchor value, which is a non-negative integer starting from 0. The anchor value 0 is valid and can be used to reference extension entities, but prefer non-zero values for ergonomics. The name scheme per type works as follows:
 
 | Category           | Naming scheme                                                |
 | ------------------ | ------------------------------------------------------------ |
 | Type               | The name as defined on the type object.                      |
 | Type Variation     | The name as defined on the type variation object.            |
-| Function Signature | A function signature compound name as described below.       |
+| Function Signature | A function signature as described below.       |
 
-A YAML file can also reference types and type variations defined in another YAML file. To do this, it must declare the extension it depends on using a key-value pair in the `dependencies` key, where the value is the extension URN, and the key is a valid identifier that can then be used as an identifier-safe alias for the extension URN. This alias can then be used as a `.`-separated namespace prefix wherever a type class or type variation name is expected.
+### Referencing User-Defined Types
 
-For example, if the extension with extension URN `extension:io.substrait:extension_types` defines a type called `point`, a different YAML file can use the type in a function declaration as follows:
+Within YAML extension files, [user-defined types](../types/type_classes.md#user-defined-types) must be referenced with the `u!` prefix followed by the type name (e.g., `u!point`) in function arguments and return types:
 
 ```yaml
-urn: extension:example:distance_functions
-dependencies:
-  ext: extension:io.substrait:extension_types
-scalar_functions:
-- name: distance
-  description: The distance between two points.
-  impls:
-  - args:
-    - name: a
-      value: ext.point
-    - name: b
-      value: ext.point
-    return: f64
+--8<-- "examples/types/user_defined_point.yaml"
+```
+
+[Built-in types](../types/type_classes.md#built-in-types) like `i32`, `string`, or `list` (as in `list<fp64>`) do not use any prefix.
+
+A YAML file can also reference types defined in another YAML file. To do this, it must declare the extension it depends on using a key-value pair in the `dependencies` key, where the value is the extension URN, and the key is a valid identifier that can then be used as an identifier-safe alias for the extension URN. This alias can then be used as a `.`-separated namespace prefix wherever a type name is expected. Note that user-defined types still require the `u!` prefix when referenced via namespace aliases (e.g., `ext.u!point`).
+
+!!! note "Grammar"
+    The grammar for referencing [user-defined types](../types/type_classes.md#user-defined-types) is (in [ABNF](https://datatracker.ietf.org/doc/html/rfc5234)):
+    ```abnf
+    udt-reference = [dependency-alias "."] "u!" type-name
+    ```
+
+For example, if the extension with extension URN `extension:org.example:extension_types` defines a user-defined type called `point`, a different YAML file can use the type in a function declaration as follows:
+
+```yaml
+--8<-- "examples/extensions/distance_functions.yaml"
 ```
 
 Here, the choice for the name `ext` is arbitrary, as long as it does not conflict with anything else in the YAML file.
 
-### Function Signature Compound Names
+### Function Signature
 
-A YAML file may contain one or more functions by the same name. The key used in the function extension declaration to reference a function is a combination of the name of the function along with a list of the required input argument types. The format is as follows:
+A YAML file may contain one or more functions with the same name, each with one or more implementations (impls). A specific function implementation within a YAML file can be identified using a Function Signature which consists of two components:
 
-```
-<function name>:<short_arg_type0>_<short_arg_type1>_..._<short_arg_typeN>
-```
+* Function Name: the name of the function
+* Argument Signature: the short type names of each argument joined with underscores
 
-Rather than using a full data type representation, the input argument types (`short_arg_type`) are mapped to single-level short name. The mappings are listed in the table below.
+These are combined with a colon separator.
 
-!!! note
+The resulting function signatures look like: `<function_name>:<short_arg_type0>_<short_arg_type1>_..._<short_arg_typeN>`
 
-    Every compound function signature must be unique.  If two function implementations in a YAML file would generate the same compound function signature, then the YAML file is invalid and behavior is undefined.
+!!! note "Grammar"
+    The formal grammar for function signatures (in [ABNF](https://datatracker.ietf.org/doc/html/rfc5234)):
+    ```abnf
+    function-signature = function-name ":" argument-signature
+    argument-signature = [short-arg-type *("_" short-arg-type)]
+    ```
+
+Argument types (`short_arg_type`) are encoded using the Type Short Names given below.
+
+#### Variadic Functions
+
+For variadic functions, the variadic argument is included *once* in the argument signature.
+
+#### Zero-Argument Functions
+
+An implementation that declares no arguments has an empty argument signature. The colon separator is still required, so such an implementation is referenced by its function name followed by a trailing colon: `count:` for the record-counting implementation of `count`, or `rank:` for `rank`. A bare function name with no colon is not a function signature and cannot be used to reference an implementation.
+
+A function can have at most one zero-argument implementation, since a second one would produce the same signature and violate the [Uniqueness Constraint](#uniqueness-constraint).
+
+Because there are no arguments to bind against, the return type must be concrete: neither the `any` and `any[\d]` placeholders nor a type expression with unresolved type parameters has anything to resolve against. A parameterized type with concrete parameter values, such as `decimal<38,0>`, is unaffected.
+
+#### Uniqueness Constraint
+
+A function signature uniquely identifies a function implementation within a single YAML file. As such, every function implementation within a YAML **must** have a distinct function signature in order for references to the implementation to remain unambiguous. This uniqueness constraint applies across all function types in the YAML file, not separately within scalar functions, aggregate functions, and window functions. Extension declarations in plans identify functions by signature only, rather than by a combination of signature and function type, so this avoids requiring consumers to infer function type from invocation context, such as when an aggregate function is used in a window context. A YAML file in which this is not the case is invalid.
+
+#### Type Short Names
 
 | Argument Type                   | Signature Name |
 |---------------------------------|----------------|
-| Required Enumeration            | req            |
+| Enumeration                     | req            |
 | i8                              | i8             |
 | i16                             | i16            |
 | i32                             | i32            |
@@ -78,10 +112,7 @@ Rather than using a full data type representation, the input argument types (`sh
 | string                          | str            |
 | binary                          | vbin           |
 | boolean                         | bool           |
-| timestamp                       | ts             |
-| timestamp_tz                    | tstz           |
 | date                            | date           |
-| time                            | time           |
 | interval_year                   | iyear          |
 | interval_day                    | iday           |
 | interval_compound               | icompound      |
@@ -96,59 +127,163 @@ Rather than using a full data type representation, the input argument types (`sh
 | struct&lt;T1,T2,...,TN&gt;      | struct         |
 | list&lt;T&gt;                   | list           |
 | map&lt;K,V&gt;                  | map            |
+| func&lt;T-&gt;R&gt;, func&lt;(T1,...,TN)-&gt;R&gt; | func |
 | any[\d]?                        | any            |
-| user defined type               | u!name         |
+| user-defined type &lt;name&gt;  | u!&lt;name&gt; |
 
 #### Examples
 
-| Function Signature                                | Function Name    |
-| ------------------------------------------------- | ---------------- |
-| `add(optional enumeration, i8, i8) => i8`         | `add:i8_i8`  |
-| `avg(fp32) => fp32`                               | `avg:fp32`       |
-| `extract(required enumeration, timestamp) => i64` | `extract:req_ts` |
-| `sum(any1) => any1`                               | `sum:any`        |
+Function-level [options](../expressions/scalar_functions.md#options) are not part of the function signature and do not appear here. Only enumeration arguments (which are positional and required) contribute to the signature as `req`.
+
+| Function Declaration                              | Function Signature  |
+| ------------------------------------------------- | ------------------- |
+| `add(i8, i8) => i8`                               | `add:i8_i8`         |
+| `avg(fp32) => fp32`                               | `avg:fp32`          |
+| `extract(required enumeration, precision_timestamp<6>) => i64` | `extract:req_pts`    |
+| `sum(any1) => any1`                               | `sum:any`           |
+| `concat(str...) => str`                           | `concat:str`        |
+| `transform(list<any1>, func<any1 -> any2>) => list<any2>` | `transform:list_func` |
+| `count() => i64`                                  | `count:`            |
+| `row_number() => i64?`                            | `row_number:`       |
 
 ### Any Types
 
 ```yaml
-scalar_functions:
-- name: foo
-  impls:
-  - args:
-    - name: a
-      value: any
-    - name: b
-      value: any
-    return: int64
+--8<-- "examples/extensions/any_type_function.yaml"
 ```
 
 The `any` type indicates that the argument can take any possible type. In the `foo` function above, arguments `a` and `b` can be of any type, even different ones in the same function invocation.
 
 ```yaml
-scalar_functions:
-- name: bar
-  impls:
-  - args:
-    - name: a
-      value: any1
-    - name: b
-      value: any1
-    return: int64
+--8<-- "examples/extensions/any1_type_function.yaml"
 ```
-The `any[\d]` types (i.e. `any1`, `any2`, ..., `any9`) impose an additional restriction. Within a single function invocation, all any types with same numeric suffix _must_ be of the same type. In the `bar` function above, arguments `a` and `b` can have any type as long as both types are the same.
+The `any[\d]` types (i.e. `any1`, `any2`, ..., `any9`) impose an additional restriction. Within a single function invocation, all `any` types with the same numeric suffix _must_ bind to the same type. In the `bar` function above, arguments `a` and `b` can have any type as long as both types are the same.
 
+How `any` type parameters interact with nullability during function binding depends on the function's [nullability mode](../expressions/scalar_functions.md#nullability-handling). See [Nullability and `any` Type Binding](../expressions/scalar_functions.md#nullability-and-any-type-binding) for the full rules and detailed examples.
+
+### Extension Metadata
+
+Extensibility is a core principle of Substrait. To ensure that the extension mechanism itself remains extensible, extension files support an optional `metadata` field that can contain arbitrary data created by the extension author. If you find that the standard YAML schema lacks a field you need, the metadata field provides a forward-compatible way to add it without waiting for schema changes.
+
+This field is available at multiple levels to provide flexibility:
+
+- **Top-level**: Metadata about the extension file itself
+- **Type definitions**: Metadata about custom types
+- **Functions**: Metadata about functions (scalar, aggregate, and window functions)
+
+Example:
+```yaml
+--8<-- "examples/extensions/metadata_example.yaml"
+```
+
+Consumers of extension files are not required to understand or validate metadata fields.
+
+### Deprecation of Extensions
+
+An extension entry can be deprecated. Producing a plan using deprecated extensions is discouraged for forward compatibility. The `deprecated` field can be added to types, type variations, functions (scalar, aggregate, and window), and individual function implementations.
+
+Consumers of extension files are not required to understand or validate deprecation fields.
+
+The `deprecated` field requires a `since` field — a [semantic version](https://semver.org) string (e.g. `"1.2.0"`) using only the core `major.minor.patch` components, specifying the version at which the entry was deprecated.
+
+* For Substrait core extensions, `since` follows the Substrait release version.
+* For third-party extensions, extension authors may use `since` to indicate a deprecation version, but there is no official behavior defined.
+
+An optional `reason` string can describe why the entry was deprecated, and an optional `metadata` object can hold arbitrary data from the extension author.
+
+Example:
+```yaml
+--8<-- "examples/extensions/deprecation_example.yaml"
+```
 
 ## Advanced Extensions
 
-Less common extensions can be extended using customization support at the serialization level. This includes the following kinds of extensions:
+Advanced extensions provide a way to embed custom functionality that goes beyond the standard YAML-based simple extensions. Unlike simple extensions, advanced extensions allow arbitrary, custom schemas. In the Protocol Buffers implementation, the `google.protobuf.Any` type is used to embed arbitrary extension data directly into Substrait messages.
 
-| Extension Type                       | Description                                                  |
-| ------------------------------------ | ------------------------------------------------------------ |
-| Relation Modification (semantic)     | Extensions to an existing relation that will alter the semantics of that relation. These kinds of extensions require that any plan consumer understand the extension to be able to manipulate or execute that operator. Ignoring these extensions will result in an incorrect interpretation of the plan. An example extension might be creating a customized version of Aggregate that can optionally apply a filter before aggregating the data. <br /><br />Note: Semantic-changing extensions shouldn't change the core characteristics of the underlying relation. For example, they should *not* change the default direct output field ordering, change the number of fields output or change the behavior of physical property characteristics. If one needs to change one of these behaviors, one should define a new relation as described below. |
-| Relation Modification (optimization) | Extensions to an existing relation that can improve the efficiency of a plan consumer but don't fundamentally change the behavior of the operation. An example might be an estimated amount of memory the relation is expected to use or a particular algorithmic pattern that is perceived to be optimal. |
-| New Relations                        | Creates an entirely new kind of relation. It is the most flexible way to extend Substrait but also make the Substrait plan the least interoperable. In most cases it is better to use a semantic changing relation as oppposed to a new relation as it means existing code patterns can easily be extended to work with the additional properties. |
-| New Read Types                       | Defines a new subcategory of read that can be used in a ReadRel. One of Substrait is to provide a fairly extensive set of read patterns within the project as opposed to requiring people to define new types externally. As such, we suggest that you first talk with the Substrait community to determine whether you read type can be incorporated directly in the core specification. |
-| New Write Types                      | Similar to a read type but for writes. As with reads, the community recommends that interested extenders first discuss with the community about developing new write types in the community before using the extension mechanisms. |
-| Plan Extensions                      | Semantic and/or optimization based additions at the plan level. |
+### How Advanced Extensions Work
 
-Because extension mechanisms are different for each serialization format, please refer to the corresponding serialization sections to understand how these extensions are defined in more detail.
+Advanced extensions come in several main forms, discussed below:
+
+1. Embedded extensions: These use the `AdvancedExtension` message for adding custom data to existing Substrait messages
+2. Custom read/write types: For defining new ways to read from or write to data sources
+3. Custom relation types: For defining entirely new relational operations
+
+### Embedded Extensions via `AdvancedExtension`
+
+The simplest forms of advanced extensions use the `AdvancedExtension` message, which contains two types of extensions:
+
+```proto
+%%% proto.extensions.AdvancedExtension %%%
+```
+
+!!! note "Enhancements vs Optimizations"
+
+    * Use **optimizations** for performance hints that don't change semantics and can be safely ignored.
+    * Use **enhancements** for semantic changes that must be understood by consumers or the plan cannot be executed correctly.
+
+#### Optimizations
+
+- Provide hints to improve performance but don't change the meaning of operations
+- Can be safely ignored by consumers that don't understand them
+- Multiple optimizations can be attached to a single message
+- Examples: memory usage hints, preferred algorithms, caching strategies
+
+#### Enhancements
+
+- Modify the semantic behavior of operations
+- Must be understood by consumers, or else the plan cannot be executed correctly
+- Only one enhancement per message
+- Examples: specialized join conditions (e.g. fuzzy matching, geospatial)
+
+!!! note "Enhancement Constraints"
+
+    Semantic-changing extensions shouldn't change the core characteristics of the underlying relation. For example, they should avoid changing the default direct output field ordering or the number of fields output. If one needs to change one of these behaviors, one should define a new relation as described in [Custom Relations](#custom-relations).
+
+#### Where `AdvancedExtension` Messages Can Be Used
+
+The `AdvancedExtension` message can be attached to various parts of a Substrait plan:
+
+| Location                          | Usage                                       |
+| --------------------------------- | ------------------------------------------- |
+| **`Plan`**                        | Global extensions affecting the entire plan |
+| **`RelCommon`**                   | Extensions for any relational operator      |
+| **Relations** (e.g. `ProjectRel`) | Extensions for a specific relation type     |
+| **Hints**                         | Extensions within optimization hints        |
+| **`ReadRel.NamedTable`**          | Custom metadata to named table references   |
+| **`ReadRel.LocalFiles`**          | Custom metadata to local file sources       |
+| **`WriteRel.NamedObjectWrite`**   | Custom metadata to write targets            |
+| **`DdlRel.NamedObjectWrite`**     | Custom metadata to DDL targets              |
+
+### Custom Read and Write Types
+
+The second form of advanced extensions allows you to define extension data sources and destinations:
+
+| Extension Type                 | Description                          | Examples                     |
+| ------------------------------ | ------------------------------------ | ---------------------------- |
+| **`ReadRel.ExtensionTable`**   | Define new table source types        | APIs, specialized formats    |
+| **`WriteRel.ExtensionObject`** | Define new write destination types   | APIs, specialized formats    |
+| **`DdlRel.ExtensionObject`**   | Define new DDL destination types     | Catalogs, schema registries  |
+
+!!! note "Consider Core Specification First"
+
+    Before implementing custom read/write types as extensions, consider [checking with the Substrait community](https://substrait.io/community/#get-in-touch). If your scenario turns out to be common enough, it may be more appropriate to add it directly to the specification rather than as an extension.
+
+### Custom Relations
+
+The third form of advanced extensions provides entirely new relational operations via dedicated extension relation types. These allow you to define custom relations while maintaining proper integration with the type system:
+
+| Relation Type            | Description                           | Examples                          |
+| ------------------------ | ------------------------------------- | --------------------------------- |
+| **`ExtensionLeafRel`**   | Custom relations with no inputs       | Custom table sources              |
+| **`ExtensionSingleRel`** | Custom relations with one input       | Custom relational transformations |
+| **`ExtensionMultiRel`**  | Custom relations with multiple inputs | Custom joins                      |
+
+These extension relations are first-class relation types in Substrait and can be used anywhere a standard relation would be used.
+
+#### Output Schema
+
+Unlike standard relations, Substrait cannot specify how to derive the output schema of extension relations. It is up to producers and consumers to agree on how to derive the schema from the inputs and the `detail` field. This derivation should be documented in the protobuf definition (or equivalent) used for the `detail` field.
+
+### When to Use What
+
+Custom relations are the most flexible option, but also the least interoperable. Prefer enhancements to existing relations when they can express your use case, since this preserves existing patterns and compatibility. As a general rule, choose the least powerful extension mechanism that solves the problem.

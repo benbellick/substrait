@@ -13,17 +13,60 @@ The main top-level object used to communicate a Substrait plan using protobuf is
 %%% proto.message.Plan %%%
     ```
 
+=== "PlanRel Message"
+
+    ```proto
+%%% proto.message.PlanRel %%%
+    ```
+
+<a id="bounded-expression-nesting"></a>
+
+### Detached Relations and Expressions
+
+[Protobuf parsers impose recursion limits](https://protobuf.dev/programming-guides/proto-limits/). To reduce expression nesting, producers can move subtrees into `detached_expressions` on the containing `PlanRel` or `ExtendedExpression`, replacing them with `detached_expression_ordinal` references. Detached entries can also have ordinal children. This does not bound nesting within literals, types, field reference paths, or masks.
+
+To reduce relation nesting, producers can move relation subtrees into `detached_rels` on the containing `PlanRel` or `ExtendedExpression`, replacing them with `detached_rel_ordinal` references. This includes relation trees inside subquery expressions. Detached relations may themselves contain detached relation ordinals, allowing a producer to split arbitrarily deep relation trees into bounded-depth chunks.
+
+Detachment is encoding-only, not computation sharing. Resolving ordinals must recover the same logical relation and expression trees and preserve their semantics. Expression-kind requirements, such as literal-only arguments, apply after resolution. Use [`ReferenceRel`](../relations/logical_relations.md#reference-operator) for intentional relation sharing.
+
+Substrait relations and expressions inside extension-defined `google.protobuf.Any` payloads may use detached ordinals referring to the containing message's corresponding table. The same container-local rules below apply when those payloads are interpreted.
+
+For each `PlanRel` or `ExtendedExpression`, consumers validate the relation and expression trees reachable from `PlanRel.rel`, `PlanRel.root`, or `ExtendedExpression.referred_expr`, and from extension payloads they interpret, following detached references transitively. The following rules apply to this reachable portion:
+
+1. Relation ordinals are zero-based indices into `detached_rels`; expression ordinals index `detached_expressions`. Both tables belong to the containing `PlanRel` or `ExtendedExpression`. Ordinals must be in range and cannot reference another container, including a `ReferenceRel` target.
+2. Within the reachable portion, each detached entry may be referenced at most once, including references from other detached entries.
+3. References must be acyclic.
+4. A detached entry must have its `rel_type` or `rex_type` set to a non-ordinal variant, but its child relations and expressions may be ordinals.
+
+Consumers must reject violations in the reachable portion. Unreachable detached entries are allowed, are not execution roots, and need not be resolved or validated. The existing [rules for ignoring extension payloads](#advanced-extensions) remain unchanged.
+
+When retaining opaque extension payloads, consumers must not remove or renumber detached entries unless they can ensure that references inside those payloads continue to identify the same relation and expression subtrees.
+
+=== "Detached Expression"
+
+    ```protobuf
+    --8<-- "examples/proto-textformat/plan_rel/detached_expressions.textproto"
+    ```
+
+=== "Detached Relation"
+
+    ```protobuf
+    --8<-- "examples/proto-textformat/plan_rel/detached_rels.textproto"
+    ```
+
+See also the ExtendedExpression examples for [detached expressions](../expressions/extended_expression.md#detached-expressions) and [detached relations](../expressions/extended_expression.md#detached-relations).
+
 ## Extensions
 Protobuf supports both [simple](../extensions/index.md#simple-extensions) and [advanced](../extensions/index.md#advanced-extensions) extensions. Simple extensions are declared at the plan level and advanced extensions are declared at multiple levels of messages within the plan.
 
 ### Simple Extensions
 
-For simple extensions, a plan references the extension URNs associated with the simple extensions to provide additional plan capabilities. These URNs will identify additional relevant information for the plan. 
+For simple extensions, a plan references the extension URNs associated with the simple extensions to provide additional plan capabilities. These URNs will identify additional relevant information for the plan.
 
 Simple extensions within a plan are split into three components: an extension URN, an extension declaration and a number of references.
 
 * **Extension URN**: A unique identifier for the extension following the format `extension:<OWNER>:<ID>` that identifies a YAML document specifying one or more specific extensions. Declares an anchor that can be used in extension declarations.
-* **Extension Declaration**: A specific extension within a single YAML document. The declaration combines a reference to the associated extension URN along with a unique key identifying the specific item within that YAML document (see [Function Signature Compound Names](../extensions/index.md#function-signature-compound-names)). It also defines a declaration anchor. The anchor is a plan-specific unique value that the producer creates as a key to be referenced elsewhere.
+* **Extension Declaration**: A specific extension within a single YAML document. The declaration combines a reference to the associated extension URN along with a unique key identifying the specific item within that YAML document (see [Function Signature](../extensions/index.md#function-signature)). It also defines a declaration anchor. The anchor is a plan-specific unique value that the producer creates as a key to be referenced elsewhere.
 * **Extension Reference**: A specific instance or use of an extension declaration within the plan body.
 
 Extension URNs and declarations are encapsulated in the top level of the plan. Extension declarations are then referenced throughout the body of the plan itself. The exact structure of these references will depend on the extension point being used, but they will always include the extension's anchor (or key). For example, all scalar function expressions contain references to an extension declaration which defines the semantics of the function.
@@ -35,6 +78,10 @@ Extension URNs and declarations are encapsulated in the top level of the plan. E
     ```
 
 Once the YAML file extension URN anchor is defined, the anchor will be referenced by zero or more `SimpleExtensionDefinition`s. For each simple extension definition, an anchor is defined for that specific extension entity. This anchor is then referenced to within lower-level primitives (functions, etc.) to reference that specific extension. Message properties are named `*_anchor` where the anchor is defined and `*_reference` when referencing the anchor. For example `function_anchor` and `function_reference`.
+
+[Named lambdas](../expressions/lambda_expressions.md#named-lambdas) use the same anchor and reference naming convention, but their anchors form a separate namespace from extension function anchors. Both `LambdaInvocation.named_lambda.lambda_reference` and `NamedLambdaReference.lambda_reference` resolve a `NamedLambda.lambda_anchor` in `Plan.named_lambdas`; the former invokes the lambda, while the latter denotes a function value.
+
+Anchor values are non-negative integers starting from 0. A value of 0 is valid and can be used to reference an extension entity, but prefer non-zero values for ergonomics.
 
 === "Simple Extension Declaration"
 
@@ -54,7 +101,7 @@ Once the YAML file extension URN anchor is defined, the anchor will be reference
 
 ### Advanced Extensions
 
-Substrait protobuf exposes a special object in multiple places in the representation to expose extension capabilities. Extensions are done via this object. Extensions are separated into main concepts: 
+Substrait protobuf exposes a special object in multiple places in the representation to expose extension capabilities. Extensions are done via this object. Extensions are separated into main concepts:
 
 | Advanced Extension Type | Description                                                  |
 | ----------------------- | ------------------------------------------------------------ |
@@ -64,15 +111,6 @@ Substrait protobuf exposes a special object in multiple places in the representa
 === "Advanced Extension Protobuf"
     ```proto
 %%% proto.message.AdvancedExtension %%%
-    ```
-
-## Capabilities
-
-When two systems exchanging Substrait plans want to understand each other's capabilities, they may exchange a `Capabilities` message. The capabilities message provides information on the set of simple and advanced extensions that the system supports.
-
-=== "Capabilities Message"
-    ```proto
-%%% proto.message.Capabilities %%%
     ```
 
 ## Protobuf Rationale
@@ -85,11 +123,6 @@ There are several binary IDLs that exist today. The key requirements for Substra
 * High-quality well-supported and idiomatic bindings/compilers for key languages (Python, Javascript, C++, Go, Rust, Java)
 * Compact serial representation
 
-The primary formats that exist that roughly qualify under these requirements include: Protobuf, Thrift, Flatbuf, Avro, Cap'N'Proto. Protobuf was chosen due to its clean typing system and large number of high quality language bindings. 
+The primary formats that exist that roughly qualify under these requirements include: Protobuf, Thrift, Flatbuf, Avro, Cap'N'Proto. Protobuf was chosen due to its clean typing system and large number of high quality language bindings.
 
 The binary serialization IDLs can be found on [GitHub](https://github.com/substrait-io/substrait/tree/main/proto/substrait) and are sampled throughout the documentation.
-
-
-
-
-

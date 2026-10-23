@@ -7,10 +7,18 @@ Every relation contains a common section containing optional hints and emit beha
 
 A relation which has a direct emit kind outputs the relation's output without reordering or selection.  A relation that specifies an emit output mapping can output its output columns in any order and may leave output columns out.
 
+An unset `emit_kind` is equivalent to `Direct`: the relation outputs its columns as is, without reordering or selection.  This is also the behavior when the relation carries no `common` section at all.  `Direct` and an unset `emit_kind` are semantically identical, and consumers must treat them the same way.
+
+While `Direct` is implicit, producers are encouraged to express the intent explicitly by setting `emit_kind` to `Direct` rather than leaving it unset.  An explicit `Direct` distinguishes "this relation deliberately passes its columns through" from "emit behavior was never considered", which makes plans easier to read, diff, and validate.
+
 ???+ info "Relation Output"
 
     * Many relations (such as Project) by default provide as their output the list of all their input columns plus any generated columns as its output columns.  Review each relation to understand its specific output default.
 
+
+## Relation ID
+
+A relation may carry an optional plan-wide unique identifier (`rel_anchor`). When set, the value must be >= 1 and unique across all relations in the plan. This identifier is required when the relation is the binding point for an `OuterReference` that uses `rel_reference` resolution. See [Field References — Outer References](../expressions/field_references.md#outer-references) for details.
 
 ## Hints
 

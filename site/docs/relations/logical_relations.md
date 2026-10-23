@@ -205,12 +205,14 @@ The project operation will produce one or more additional expressions based on t
 
 The cross product operation will combine two separate inputs into a single output. It pairs every record from the left input with every record of the right input.
 
+The nullability of each output field is unchanged from the corresponding input field.
+
 | Signature            | Value                                                        |
 | -------------------- | ------------------------------------------------------------ |
 | Inputs               | 2                                                            |
 | Outputs              | 1                                                            |
 | Property Maintenance | Distribution is maintained. Orderedness is empty post operation. |
-| Input Order          | The input order is the left input followed by the the right input. All field references of [Cross Product Properties](#cross-product-properties) are over this order. |
+| Input Order          | The input order is the left input followed by the right input. All field references of [Cross Product Properties](#cross-product-properties) are over this order. |
 | Direct Output Order  | Same as the `Input Order`. |
 
 ### Cross Product Properties
@@ -237,8 +239,8 @@ The join operation will combine two separate inputs into a single output, based 
 | Inputs               | 2                                                            |
 | Outputs              | 1                                                            |
 | Property Maintenance | Distribution is maintained. Orderedness is empty post operation. Physical relations may provide better property maintenance. |
-| Input Order          | The input order is the left input followed by the right input. All field references of [Join Properties](#join-properties) are over this order. |
-| Direct Output Order  | For semi joins and anti joins, the emit order is either left or right only. For mark joins, the emit order is either left or right with a "mark" column appended at the end. See [Join Types](#join-types) for detail. Otherwise, the same as `Input Order`. |
+| Input Order          | The input order is the left input followed by the right input. All field references of [Join Properties](#join-properties) except Post-Join Filter are over this order. |
+| Direct Output Order  | For semi joins and anti joins, the emit order is either left or right only. For mark joins, the emit order is either left or right with a "mark" column appended at the end. See [Join Types](#join-types) for detail. Otherwise, the same as `Input Order`. All field references of Post-Join Filter are over this order. |
 
 ### Join Properties
 
@@ -247,7 +249,7 @@ The join operation will combine two separate inputs into a single output, based 
 | Left Input       | A relational input.                                          | Required                           |
 | Right Input      | A relational input.                                          | Required                           |
 | Join Expression  | A boolean condition that describes whether each record from the left set "match" the record from the right set. Field references correspond to the input order of the data. | Required. Can be the literal True. |
-| Post-Join Filter | A boolean condition to be applied to each result record after the inputs have been joined, yielding only the records that satisfied the condition. | Optional                           |
+| Post-Join Filter | An optional boolean condition applied to the output of the join. Semantically equivalent to placing a [Filter](#filter-operation) directly above the join. Does not influence which rows are considered matches. Field references correspond to the direct output order of the join operation. | Optional, defaults to True.        |
 | Join Type        | One of the join types defined below.                         | Required                           |
 
 ### Join Types
@@ -274,6 +276,40 @@ The join operation will combine two separate inputs into a single output, based 
 %%% proto.algebra.JoinRel %%%
     ```
 
+## Lateral Join Operation
+
+The lateral join operation is represented by `LateralJoinRel`.
+
+`LateralJoinRel` uses the same fields and `JoinRel.JoinType` enum as [Join Operation](#join-operation). For field meanings and join-type behavior, refer to the `JoinRel` documentation above.
+
+In `LateralJoinRel`, the right input is evaluated once per row of the left input and may reference fields of the current left row via `OuterReference.rel_reference`. When the right input references the current left row, `LateralJoinRel` must set `RelCommon.rel_anchor`, and `rel_reference` points to that anchor. Right-input outer references may also point to other outer roots when applicable. See [Field References — Outer References](../expressions/field_references.md#outer-references) for details.
+
+For example, the SQL query:
+
+```sql
+SELECT a, (SELECT MAX(b) FROM T2 WHERE T2.x = T1.a) FROM T1
+```
+
+can be represented as an inner lateral join where `T1` is the left input and the scalar subquery `SELECT MAX(b) FROM T2 WHERE T2.x = T1.a` is the right input. Semantically, the scalar subquery is evaluated for each row in the T1 and references the value of column `a` using outer reference.
+
+### Valid Join Types for LateralJoinRel
+
+Supported join types:
+
+- `INNER`
+- `LEFT`
+- `LEFT_SEMI`
+- `LEFT_ANTI`
+- `LEFT_SINGLE`
+- `LEFT_MARK`
+
+All other join types are invalid for `LateralJoinRel`.
+
+=== "LateralJoinRel Message"
+
+    ```proto
+%%% proto.algebra.LateralJoinRel %%%
+    ```
 
 ## Set Operation
 
@@ -425,6 +461,10 @@ We could use the `ReferenceRel` to highlight the shared `A JOIN B` between the t
 One expressing `A JOIN B` (in position 0 in the plan), one using reference as follows: `ReferenceRel(0) JOIN C` and a third one
 doing `ReferenceRel(0) JOIN D`. This allows to avoid the redundancy of `A JOIN B`.
 
+!!! note "Outer references in shared relations"
+
+    When a shared relation contains an unresolved outer reference, the reference must use `rel_reference` instead of `steps_out`, because a `ReferenceRel` can be reached through multiple paths of different depths, making offset-based resolution ambiguous. See [Field References — Outer References](../expressions/field_references.md#outer-references) for details.
+
 | Signature            | Value                                 |
 | -------------------- |---------------------------------------|
 | Inputs               | 1                                     |
@@ -556,6 +596,3 @@ The operator that defines modifications of a database schema (CREATE/DROP/ALTER 
 %%% proto.algebra.DdlRel %%%
     ```
 
-???+ question "Discussion Points"
-
-    * How should correlated operations be handled?

@@ -14,6 +14,11 @@ option java_package = "io.substrait.proto";
 
 // Common fields for all relational operators
 message RelCommon {
+  // Controls which of the relation's columns are output and in what order.
+  // Leaving emit_kind unset is equivalent to setting Direct: the relation's
+  // columns are output as is. An absent RelCommon on a relation is likewise
+  // treated as Direct. Producers are encouraged to
+  // set it explicitly to express the intent.
   oneof emit_kind {
     // The underlying relation is output as is (no reordering or projection of columns)
     Direct direct = 1;
@@ -24,7 +29,13 @@ message RelCommon {
   Hint hint = 3;
   substrait.extensions.AdvancedExtension advanced_extension = 4;
 
-  // Direct indicates no change on presence and ordering of fields in the output
+  // Optional plan-wide unique identifier for this relation. Required when
+  // this relation is the binding point for an OuterReference using
+  // rel_reference. Must be unique across all rels within a Plan.
+  // Must be >= 1 when set.
+  optional uint32 rel_anchor = 5;
+
+  // Direct indicates no change on presence and ordering of fields in the output.
   message Direct {}
 
   // Remap which fields are output and in which order
@@ -151,7 +162,9 @@ message ReadRel {
 
   // A table composed of expressions.
   message VirtualTable {
-    repeated Expression.Literal.Struct values = 1 [deprecated = true];
+    reserved 1;
+    reserved "values";
+
     repeated Expression.Nested.Struct expressions = 2;
   }
 
@@ -255,12 +268,18 @@ message ProjectRel {
   substrait.extensions.AdvancedExtension advanced_extension = 10;
 }
 
-// The binary JOIN relational operator left-join-right, including various join types, a join condition and post_join_filter expression
+// The binary JOIN relational operator left-join-right, including various join
+// types, a join condition, and an optional filter on the joined output.
 message JoinRel {
   RelCommon common = 1;
   Rel left = 2;
   Rel right = 3;
+  // A boolean condition evaluated over the left and right inputs that
+  // determines whether a pair of records is a match.
   Expression expression = 4;
+  // An optional boolean filter applied to each output record after
+  // join-type-specific output formation is complete.
+  // Semantically equivalent to placing a FilterRel directly above this join.
   Expression post_join_filter = 5;
 
   JoinType type = 6;
@@ -284,6 +303,40 @@ message JoinRel {
   substrait.extensions.AdvancedExtension advanced_extension = 10;
 }
 
+// The binary lateral JOIN relational operator left-join-right. This is
+// semantically identical to JoinRel, except the right input is evaluated once
+// per row of the left input and may reference fields from the current left row
+// via OuterReference rel_reference.
+//
+// LateralJoinRel must set RelCommon.rel_anchor so the right input can
+// reference fields of the current left row.
+message LateralJoinRel {
+  RelCommon common = 1;
+  // The independent input whose rows drive evaluation of the lateral join.
+  Rel left = 2;
+
+  // The dependent input evaluated once per left row. It may reference fields
+  // from the current left row using OuterReference.rel_reference pointing to
+  // this LateralJoinRel's RelCommon.rel_anchor.
+  Rel right = 3;
+  // A boolean condition evaluated over the left and right inputs that
+  // determines whether a pair of records is a match.
+  Expression expression = 4;
+  // An optional boolean filter applied to each output record after
+  // join-type-specific output formation is complete.
+  // Semantically equivalent to placing a FilterRel directly above this join.
+  Expression post_join_filter = 5;
+
+  // Only INNER and left-oriented join types are valid for lateral joins:
+  // INNER, LEFT, LEFT_SEMI, LEFT_ANTI, LEFT_SINGLE, LEFT_MARK.
+  // RIGHT-oriented join types and OUTER are not valid because the right input
+  // is evaluated in the context of each left row and has no independent
+  // existence.
+  JoinRel.JoinType type = 6;
+
+  substrait.extensions.AdvancedExtension advanced_extension = 10;
+}
+
 // Cartesian product relational operator of two tables (left and right)
 message CrossRel {
   RelCommon common = 1;
@@ -295,36 +348,23 @@ message CrossRel {
 
 // The relational operator representing LIMIT/OFFSET or TOP type semantics.
 message FetchRel {
+  reserved 3, 4;
+  reserved "offset", "count";
+
   RelCommon common = 1;
   Rel input = 2;
-  // Note: A oneof field is inherently optional, whereas individual fields
-  // within a oneof cannot be marked as optional. The unset state of offset
-  // should therefore be checked at the oneof level. Unset is treated as 0.
-  oneof offset_mode {
-    // the offset expressed in number of records
-    // Deprecated: use `offset_expr` instead
-    int64 offset = 3 [deprecated = true];
-    // Expression evaluated into a non-negative integer specifying the number
-    // of records to skip. An expression evaluating to null is treated as 0.
-    // Evaluating to a negative integer should result in an error.
-    // Recommended type for offset is int64.
-    Expression offset_expr = 5;
-  }
-  // Note: A oneof field is inherently optional, whereas individual fields
-  // within a oneof cannot be marked as optional. The unset state of count
-  // should therefore be checked at the oneof level. Unset is treated as ALL.
-  oneof count_mode {
-    // the amount of records to return
-    // use -1 to signal that ALL records should be returned
-    // Deprecated: use `count_expr` instead
-    int64 count = 4 [deprecated = true];
-    // Expression evaluated into a non-negative integer specifying the number
-    // of records to return. An expression evaluating to null signals that ALL
-    // records should be returned.
-    // Evaluating to a negative integer should result in an error.
-    // Recommended type for count is int64.
-    Expression count_expr = 6;
-  }
+  // Expression evaluated into a non-negative integer specifying the number
+  // of records to skip. An expression evaluating to null is treated as 0.
+  // Evaluating to a negative integer should result in an error.
+  // Recommended type for offset is int64. Unset is treated as 0.
+  Expression offset_expr = 5;
+  // Expression evaluated into a non-negative integer specifying the number
+  // of records to return. An expression evaluating to null signals that ALL
+  // records should be returned.
+  // Evaluating to a negative integer should result in an error.
+  // Recommended type for count is int64. Unset signals that ALL records
+  // should be returned.
+  Expression count_expr = 6;
   substrait.extensions.AdvancedExtension advanced_extension = 10;
 }
 
@@ -353,8 +393,7 @@ message AggregateRel {
   substrait.extensions.AdvancedExtension advanced_extension = 10;
 
   message Grouping {
-    // Deprecated in favor of `expression_references` below.
-    repeated Expression grouping_expressions = 1 [deprecated = true];
+    reserved 1;
 
     // A list of zero or more references to grouping expressions, i.e., indices
     // into the `grouping_expression` list.
@@ -372,9 +411,8 @@ message AggregateRel {
   }
 }
 
-// ConsistentPartitionWindowRel provides the ability to perform calculations across sets of rows
-// that are related to the current query row. It can be used to execute window functions where
-// all the windows share the same partitioning and ordering.
+// Window functions with shared partitioning and ordering.
+// See https://substrait.io/expressions/window_functions/#window-bindings
 message ConsistentPartitionWindowRel {
   RelCommon common = 1;
   Rel input = 2;
@@ -384,10 +422,11 @@ message ConsistentPartitionWindowRel {
 
   substrait.extensions.AdvancedExtension advanced_extension = 10;
 
-  // This message mirrors the `WindowFunction` message but removes the fields defining the partition,
-  // sorts, and bounds, since those must be consistent across the various functions in this rel.  Refer
-  // to the `WindowFunction` message for a description of these fields.
+  // Mirrors Expression.WindowFunction with partitioning and ordering supplied
+  // by the enclosing relation. Each function has its own frame bounds and mode.
+  // See https://substrait.io/expressions/window_functions/
   message WindowRelFunction {
+    // References a function_anchor defined in this plan.
     uint32 function_reference = 1;
 
     repeated FunctionArgument arguments = 9;
@@ -400,10 +439,16 @@ message ConsistentPartitionWindowRel {
 
     AggregateFunction.AggregationInvocation invocation = 10;
 
+    // Inclusive lower bound; defaults to the start of the partition.
+    // See https://substrait.io/expressions/window_functions/#frame-bounds
     Expression.WindowFunction.Bound lower_bound = 5;
 
+    // Inclusive upper bound; defaults to the end of the partition.
+    // See https://substrait.io/expressions/window_functions/#frame-bounds
     Expression.WindowFunction.Bound upper_bound = 4;
 
+    // Required bound mode. Uses the enclosing relation's sorts.
+    // See https://substrait.io/expressions/window_functions/#bound-modes
     Expression.WindowFunction.BoundsType bounds_type = 12;
   }
 }
@@ -446,20 +491,23 @@ message SetRel {
   }
 }
 
-// Stub to support extension with a single input
+// A custom relational operator with a single input. Producers and consumers
+// must agree on how to derive the output schema of the relation.
 message ExtensionSingleRel {
   RelCommon common = 1;
   Rel input = 2;
   google.protobuf.Any detail = 3;
 }
 
-// Stub to support extension with a zero inputs
+// A custom relational operator with zero inputs. Producers and consumers
+// must agree on how to derive the output schema of the relation.
 message ExtensionLeafRel {
   RelCommon common = 1;
   google.protobuf.Any detail = 2;
 }
 
-// Stub to support extension with multiple inputs
+// A custom relational operator with multiple inputs. Producers and consumers
+// must agree on how to derive the output schema of the relation.
 message ExtensionMultiRel {
   RelCommon common = 1;
   repeated Rel inputs = 2;
@@ -535,6 +583,8 @@ message ExpandRel {
   // expression was provided).
   repeated ExpandField fields = 4;
 
+  substrait.extensions.AdvancedExtension advanced_extension = 10;
+
   message ExpandField {
     oneof field_type {
       // Field that switches output based on which duplicate is being output.  Every
@@ -556,13 +606,48 @@ message ExpandRel {
   }
 }
 
+// The top-N relational operator. A combination of a sort and fetch that only
+// maintains the number of records required to ensure a limited output.
+message TopNRel {
+  RelCommon common = 1;
+  Rel input = 2;
+
+  // List of one or more fields to sort by. At least one is required.
+  repeated SortField sorts = 3;
+
+  // Expression evaluating to a non-negative integer specifying the number of
+  // records to skip. Null is treated as 0. Recommended type is int64.
+  Expression offset = 4;
+
+  // Expression evaluating to a non-negative integer specifying the number of
+  // records to return. Null signals ALL. Recommended type is int64.
+  Expression count = 5;
+
+  // Determines how to handle rows tied with the last returned row.
+  FetchMode mode = 6;
+
+  substrait.extensions.AdvancedExtension advanced_extension = 7;
+}
+
+// Determines how a fetch operation handles rows tied with the last returned row.
+enum FetchMode {
+  // Unspecified. Producers must set one of the defined modes.
+  FETCH_MODE_UNSPECIFIED = 0;
+  // Only return the requested number of rows.
+  FETCH_MODE_ROWS_ONLY = 1;
+  // Include additional rows tied with the last row (per the sort fields).
+  FETCH_MODE_WITH_TIES = 2;
+}
+
 // A relation with output field names.
 //
 // This is for use at the root of a `Rel` tree.
 message RelRoot {
   // A relation
   Rel input = 1;
-  // Field names in depth-first order
+  // Field names in depth-first order. The number of names must match the number
+  // of named fields in the output type. For extension relations, the output type
+  // is determined by the extension relation contract.
   repeated string names = 2;
 }
 
@@ -575,6 +660,7 @@ message Rel {
     AggregateRel aggregate = 4;
     SortRel sort = 5;
     JoinRel join = 6;
+    LateralJoinRel lateral_join = 24;
     ProjectRel project = 7;
     SetRel set = 8;
     ExtensionSingleRel extension_single = 9;
@@ -592,6 +678,11 @@ message Rel {
     ConsistentPartitionWindowRel window = 17;
     ExchangeRel exchange = 15;
     ExpandRel expand = 16;
+    TopNRel top_n = 23;
+    // Encoding-only, zero-based index into detached_rels on the
+    // containing PlanRel or ExtendedExpression.
+    // See https://substrait.io/serialization/binary_serialization/#detached-relations-and-expressions.
+    uint32 detached_rel_ordinal = 25;
   }
 }
 
@@ -735,6 +826,8 @@ message UpdateRel {
   // The list of transformations to apply to the columns of the named_table
   repeated TransformExpression transformations = 4;
 
+  RelCommon common = 6;
+
   message TransformExpression {
     Expression transformation = 1; // the transformation to apply
     int32 column_target = 2; // index of the column to apply the transformation to
@@ -788,27 +881,26 @@ message ComparisonJoinKey {
       // A custom comparison behavior is used.  This can happen, for example, when using
       // collations, where we might want to do something like a case-insensitive comparison.
       //
-      // This must be a binary function with a boolean return type
+      // This must be a binary function with a boolean return type.
       uint32 custom_function_reference = 2;
     }
   }
 }
 
-// The hash equijoin operator will build a hash table out of one input (default `right`) based on a set of join keys.
-// It will then probe that hash table for the other input (default `left`), finding matches.
+// The hash join operator will build a hash table out of one input (default
+// `right`) based on a set of join keys. It will then probe that hash table for
+// the other input (default `left`), finding matches.
 //
-// Two rows are a match if the comparison function returns true for all keys
+// Two rows are a match if every key comparison returns true and, when
+// specified, `residual_expression` also evaluates to true.
 message HashJoinRel {
+  reserved 4, 5;
+  reserved "left_keys", "right_keys";
+
   RelCommon common = 1;
   Rel left = 2;
   Rel right = 3;
-  // These fields are deprecated in favor of `keys`.  If they are set then
-  // the two lists (left_keys and right_keys) must have the same length and
-  // the comparion function is considered to be SimpleEqualityType::EQ
-  repeated Expression.FieldReference left_keys = 4 [deprecated = true];
-  repeated Expression.FieldReference right_keys = 5 [deprecated = true];
-  // One or more keys to join on.  The relation is invalid if this is empty
-  // (unless the deprecated left_keys/right_keys fields are being used).
+  // One or more keys to join on.  The relation is invalid if this is empty.
   //
   // If a custom comparison function is used then it must be consistent with
   // the hash function used for the keys.
@@ -821,12 +913,23 @@ message HashJoinRel {
   // hash function for a given comparsion function or to reject the plan if it cannot
   // do so.
   repeated ComparisonJoinKey keys = 8;
+  // An optional boolean filter applied to each output record after
+  // join-type-specific output formation is complete.
+  // Semantically equivalent to placing a FilterRel directly above this join.
   Expression post_join_filter = 6;
 
   JoinType type = 7;
 
-  // Specifies which side of input to build the hash table for this hash join. Default is `BUILD_INPUT_RIGHT`.
+  // Specifies which side of input to build the hash table for this hash join.
+  // Defaults to `BUILD_INPUT_RIGHT`.
   BuildInput build_input = 9;
+  // An optional boolean expression evaluated on each candidate key-match to
+  // determine whether it is a true match. A candidate is only considered a
+  // match when all `keys` comparisons AND this expression evaluate to true.
+  // This expression interacts with join-type semantics: for example, in a
+  // left outer join, a left row that has key matches but no candidate
+  // satisfying this expression will be emitted with nulls for the right side.
+  Expression residual_expression = 11;
 
   enum JoinType {
     JOIN_TYPE_UNSPECIFIED = 0;
@@ -853,19 +956,17 @@ message HashJoinRel {
   substrait.extensions.AdvancedExtension advanced_extension = 10;
 }
 
-// The merge equijoin does a join by taking advantage of two sets that are sorted on the join keys.
-// This allows the join operation to be done in a streaming fashion.
+// The merge join does a join by taking advantage of two sets that are
+// sorted on the join keys. This allows the join operation to be done in a
+// streaming fashion.
 message MergeJoinRel {
+  reserved 4, 5;
+  reserved "left_keys", "right_keys";
+
   RelCommon common = 1;
   Rel left = 2;
   Rel right = 3;
-  // These fields are deprecated in favor of `keys`.  If they are set then
-  // the two lists (left_keys and right_keys) must have the same length and
-  // the comparion function is considered to be SimpleEqualityType::EQ
-  repeated Expression.FieldReference left_keys = 4 [deprecated = true];
-  repeated Expression.FieldReference right_keys = 5 [deprecated = true];
-  // One or more keys to join on.  The relation is invalid if this is empty
-  // (unless the deprecated left_keys/right_keys fields are being used).
+  // One or more keys to join on.  The relation is invalid if this is empty.
   //
   // If a custom comparison function is used then it must be consistent with
   // the ordering of the input data.  For example, if the comparison function
@@ -880,9 +981,19 @@ message MergeJoinRel {
   // is free to do so as well).  If possible, the consumer should verify the sort
   // order and reject invalid plans.
   repeated ComparisonJoinKey keys = 8;
+  // An optional boolean filter applied to each output record after
+  // join-type-specific output formation is complete.
+  // Semantically equivalent to placing a FilterRel directly above this join.
   Expression post_join_filter = 6;
 
   JoinType type = 7;
+  // An optional boolean expression evaluated on each candidate key-match to
+  // determine whether it is a true match. A candidate is only considered a
+  // match when all `keys` comparisons AND this expression evaluate to true.
+  // This expression interacts with join-type semantics: for example, in a
+  // left outer join, a left row that has key matches but no candidate
+  // satisfying this expression will be emitted with nulls for the right side.
+  Expression residual_expression = 9;
 
   enum JoinType {
     JOIN_TYPE_UNSPECIFIED = 0;
@@ -942,8 +1053,11 @@ message FunctionArgument {
   }
 }
 
-// An optional function argument.  Typically used for specifying behavior in
-// invalid or corner cases.
+// A named, optional behavioral preference for a function call. Options allow
+// producers to express preferences about how consumers handle corner cases or
+// engine-specific behavior (e.g. overflow or rounding mode). Unlike function
+// arguments, options are not required. If omitted, the consumer is free to
+// choose any supported behavior.
 message FunctionOption {
   // Name of the option to set. If the consumer does not recognize the
   // option, it must reject the plan. The name is matched case-insensitively
@@ -960,6 +1074,9 @@ message FunctionOption {
 }
 
 message Expression {
+  reserved 10;
+  reserved "enum";
+
   oneof rex_type {
     Literal literal = 1;
     FieldReference selection = 2;
@@ -973,27 +1090,19 @@ message Expression {
     Subquery subquery = 12;
     Nested nested = 13;
     DynamicParameter dynamic_parameter = 14;
-
-    // deprecated: enum literals are only sensible in the context of
-    // function arguments, for which FunctionArgument should now be
-    // used
-    Enum enum = 10 [deprecated = true];
-  }
-
-  message Enum {
-    option deprecated = true;
-
-    oneof enum_kind {
-      string specified = 1;
-      Empty unspecified = 2;
-    }
-
-    message Empty {
-      option deprecated = true;
-    }
+    Lambda lambda = 15;
+    LambdaInvocation lambda_invocation = 16;
+    ExecutionContextVariable execution_context_variable = 17;
+    // Encoding-only, zero-based index into detached_expressions on the
+    // containing PlanRel or ExtendedExpression.
+    // See https://substrait.io/serialization/binary_serialization/#detached-relations-and-expressions.
+    uint32 detached_expression_ordinal = 18;
+    NamedLambdaReference named_lambda_reference = 19;
   }
 
   message Literal {
+    reserved 14, 17, 27;
+
     oneof literal_type {
       bool boolean = 1;
       int32 i8 = 2;
@@ -1004,14 +1113,8 @@ message Expression {
       double fp64 = 11;
       string string = 12;
       bytes binary = 13;
-      // Timestamp in units of microseconds since the UNIX epoch.
-      // Deprecated in favor of `precision_timestamp`.
-      int64 timestamp = 14 [deprecated = true];
       // Date in units of days since the UNIX epoch.
       int32 date = 16;
-      // Time in units of microseconds past midnight.
-      // Deprecated in favor of `precision_time`.
-      int64 time = 17;
       IntervalYearToMonth interval_year_to_month = 19;
       IntervalDayToSecond interval_day_to_second = 20;
       IntervalCompound interval_compound = 36;
@@ -1025,9 +1128,6 @@ message Expression {
       PrecisionTimestamp precision_timestamp_tz = 35;
       Struct struct = 25;
       Map map = 26;
-      // Timestamp in units of microseconds since the UNIX epoch.
-      // Deprecated in favor of `precision_timestamp_tz`
-      int64 timestamp_tz = 27 [deprecated = true];
       bytes uuid = 28;
       Type null = 29; // a typed null literal
       List list = 30;
@@ -1093,17 +1193,19 @@ message Expression {
     }
 
     message IntervalDayToSecond {
+      reserved 3;
+      reserved "microseconds";
+
       int32 days = 1;
       int32 seconds = 2;
 
-      // Consumers should expect either (miroseconds) to be set or (precision and subseconds) to be set
-      oneof precision_mode {
-        int32 microseconds = 3 [deprecated = true]; // use precision and subseconds below, they cover and replace microseconds.
-        // Sub-second precision, 0 means the value given is in seconds, 3 is milliseconds, 6 microseconds, 9 is nanoseconds. Should be used with subseconds below.
-        int32 precision = 4;
-      }
+      // Sub-second precision, 0 means the value given is in seconds, 3 is milliseconds, 6 microseconds, 9 is nanoseconds, 12 is picoseconds. Should be used with subseconds below.
+      int32 precision = 4;
 
-      // the number of fractional seconds using 1e(-precision) units. Should only be used with precision field, not microseconds.
+      // The sub-second component only, expressed as the number of 1e(-precision)
+      // units (e.g. with precision 12 this is a number of picoseconds in the
+      // range [0, 1e12)). Whole seconds belong in the seconds field above, not
+      // here. Should only be used with precision field.
       int64 subseconds = 5;
     }
 
@@ -1123,8 +1225,13 @@ message Expression {
     }
 
     message UserDefined {
-      // points to a type_anchor defined in this plan
-      uint32 type_reference = 1;
+      oneof type_anchor_type {
+        // points to a type_anchor defined in this plan
+        uint32 type_reference = 1;
+
+        // points to a type_alias_anchor defined in this plan.
+        uint32 type_alias_reference = 5;
+      }
 
       // The parameters to be bound to the type class, if the type class is
       // parameterizable.
@@ -1181,11 +1288,61 @@ message Expression {
     }
   }
 
+  // A lambda expression representing an inline, anonymous function.
+  // Lambda expressions have parameters and a body expression that can reference
+  // those parameters using FieldReference with FieldReference.LambdaParameterReference as the root_type.
+  message Lambda {
+    // Parameters this lambda accepts, represented as a struct where each field corresponds
+    // to a parameter. Parameters can be accessed using FieldReference with
+    // FieldReference.LambdaParameterReference as root_type and StructField to select
+    // specific parameters. The struct's nullability must be NULLABILITY_REQUIRED.
+    Type.Struct parameters = 1;
+
+    // The lambda body expression. Lambda parameters can be referenced using FieldReference
+    // with FieldReference.LambdaParameterReference as root_type.
+    Expression body = 2;
+  }
+
+  // A function value referring to a named lambda, without invoking it.
+  // Its non-nullable Func type is derived from the referenced lambda's
+  // parameter types and body type. It does not capture the caller's scope.
+  // References within named lambda bodies, including higher-order function
+  // arguments, must form an acyclic definition dependency graph.
+  message NamedLambdaReference {
+    // References a lambda_anchor in Plan.named_lambdas, not an extension
+    // function anchor. The definition must exist in Plan.named_lambdas;
+    // named lambdas cannot be used in an ExtendedExpression.
+    // 0 is a valid anchor/reference, but prefer non-zero values for ergonomics.
+    uint32 lambda_reference = 1;
+  }
+
+  // Invokes an inline or named lambda expression with provided arguments.
+  // Enables immediate invocation patterns like ((x) -> x * 2)(5), as well as
+  // reuse of a lambda defined in Plan.named_lambdas.
+  //
+  // The return type is derived from the type of the lambda's body expression.
+  message LambdaInvocation {
+    oneof lambda_type {
+      // The inline lambda expression to invoke.
+      Lambda lambda = 1;
+
+      // References a lambda_anchor in Plan.named_lambdas.
+      NamedLambdaReference named_lambda = 3;
+    }
+
+    // Arguments to pass to the lambda, as a struct expression. The struct must have
+    // exactly one Expression field for each lambda parameter, and the expression at
+    // each position must have a type that matches the corresponding parameter type.
+    Nested.Struct arguments = 2;
+  }
+
   // A scalar function call.
   message ScalarFunction {
+    reserved 2;
+    reserved "args";
+
     // Points to a function_anchor defined in this plan, which must refer
-    // to a scalar function in the associated YAML file. Required; avoid
-    // using anchor/reference zero.
+    // to a scalar function in the associated YAML file. Required.
     uint32 function_reference = 1;
 
     // The arguments to be bound to the function. This must have exactly the
@@ -1196,26 +1353,26 @@ message Expression {
     //    the expression in that must yield a value of a type that a function
     //    overload is defined for.
     //  - Type arguments must be bound using FunctionArgument.type.
-    //  - Enum arguments must be bound using FunctionArgument.enum
-    //    followed by Enum.specified, with a string that case-insensitively
-    //    matches one of the allowed options.
+    //  - Enum arguments must be bound using FunctionArgument.enum, with a
+    //    string that case-insensitively matches one of the allowed options.
     repeated FunctionArgument arguments = 4;
 
-    // Options to specify behavior for corner cases, or leave behavior
-    // unspecified if the consumer does not need specific behavior in these
-    // cases.
+    // Optional behavioral preferences for the function call. Unlike
+    // arguments, these are not required and are not part of the function
+    // signature. If omitted, the consumer chooses its own behavior.
     repeated FunctionOption options = 5;
 
     // Must be set to the return type of the function, exactly as derived
     // using the declaration in the extension.
     Type output_type = 3;
-
-    // Deprecated; use arguments instead.
-    repeated Expression args = 2 [deprecated = true];
   }
 
   // A window function call.
+  // See https://substrait.io/expressions/window_functions/
   message WindowFunction {
+    reserved 8;
+    reserved "args";
+
     // Points to a function_anchor defined in this plan. The function must be:
     //  - a window function
     //  - an aggregate function
@@ -1223,7 +1380,7 @@ message Expression {
     // An aggregate function referenced here should be treated as a window
     // function with Window Type STREAMING
     //
-    // Required; 0 is considered to be a valid anchor/reference.
+    // Required.
     uint32 function_reference = 1;
 
     // The arguments to be bound to the function. This must have exactly the
@@ -1235,14 +1392,13 @@ message Expression {
     //    overload is defined for.
     //  - Type arguments must be bound using FunctionArgument.type, and a
     //    function overload must be defined for that type.
-    //  - Enum arguments must be bound using FunctionArgument.enum
-    //    followed by Enum.specified, with a string that case-insensitively
-    //    matches one of the allowed options.
+    //  - Enum arguments must be bound using FunctionArgument.enum, with a
+    //    string that case-insensitively matches one of the allowed options.
     repeated FunctionArgument arguments = 9;
 
-    // Options to specify behavior for corner cases, or leave behavior
-    // unspecified if the consumer does not need specific behavior in these
-    // cases.
+    // Optional behavioral preferences for the function call. Unlike
+    // arguments, these are not required and are not part of the function
+    // signature. If omitted, the consumer chooses its own behavior.
     repeated FunctionOption options = 11;
 
     // Must be set to the return type of the function, exactly as derived
@@ -1254,97 +1410,78 @@ message Expression {
     // INITIAL_TO_RESULT for window functions that are not decomposable.
     AggregationPhase phase = 6;
 
-    // If specified, the records that are part of the window defined by
-    // upper_bound and lower_bound are ordered according to this list
-    // before they are aggregated. The first sort field has the highest
-    // priority; only if a sort field determines two records to be equivalent
-    // is the next field queried. This field is optional, and is only allowed
-    // if the window function is defined to support sorting.
+    // Ordering within each partition, highest-priority sort field first.
+    // See https://substrait.io/expressions/window_functions/#window-bindings
+    // and https://substrait.io/expressions/window_functions/#bound-modes
     repeated SortField sorts = 3;
 
     // Specifies whether equivalent records are merged before being aggregated.
     // Optional, defaults to AGGREGATION_INVOCATION_ALL.
     AggregateFunction.AggregationInvocation invocation = 10;
 
-    // When one or more partition expressions are specified, two records are
-    // considered to be in the same partition if and only if these expressions
-    // yield an equal record of values for both. When computing the window
-    // function, only the subset of records within the bounds that are also in
-    // the same partition as the current record are aggregated.
+    // Partitioning expressions; empty means one partition for the entire input.
+    // See https://substrait.io/expressions/window_functions/#partitions-peer-groups-and-frames
     repeated Expression partitions = 2;
 
-    // Defines the bounds type: ROWS, RANGE
+    // Required bound mode.
+    // See https://substrait.io/expressions/window_functions/#bound-modes
     BoundsType bounds_type = 12;
 
-    // Defines the record relative to the current record from which the window
-    // extends. The bound is inclusive. If the lower bound indexes a record
-    // greater than the upper bound, TODO (null range/no records passed?
-    // wrapping around as if lower/upper were swapped? error? null?).
-    // Optional; defaults to the start of the partition.
+    // Inclusive lower bound; defaults to the start of the partition.
+    // See https://substrait.io/expressions/window_functions/#frame-bounds
     Bound lower_bound = 5;
 
-    // Defines the record relative to the current record up to which the window
-    // extends. The bound is inclusive. If the upper bound indexes a record
-    // less than the lower bound, TODO (null range/no records passed?
-    // wrapping around as if lower/upper were swapped? error? null?).
-    // Optional; defaults to the end of the partition.
+    // Inclusive upper bound; defaults to the end of the partition.
+    // See https://substrait.io/expressions/window_functions/#frame-bounds
     Bound upper_bound = 4;
 
-    // Deprecated; use arguments instead.
-    repeated Expression args = 8 [deprecated = true];
-
+    // See https://substrait.io/expressions/window_functions/#bound-modes
     enum BoundsType {
+      // Invalid; producers must select ROWS or RANGE.
       BOUNDS_TYPE_UNSPECIFIED = 0;
-      // The lower and upper bound specify how many rows before and after the current row
-      // the window should extend.
       BOUNDS_TYPE_ROWS = 1;
-      // The lower and upper bound describe a range of values.  The window should include all rows
-      // where the value of the ordering column is greater than or equal to (current_value - lower bound)
-      // and less than or equal to (current_value + upper bound).  This bounds type is only valid if there
-      // is a single ordering column.
       BOUNDS_TYPE_RANGE = 2;
     }
 
-    // Defines one of the two boundaries for the window of a window function.
+    // A frame boundary.
+    // See https://substrait.io/expressions/window_functions/#frame-bounds
     message Bound {
-      // Defines that the bound extends this far back from the current record.
+      // A bound toward earlier rows or values in the declared ordering.
       message Preceding {
-        // A strictly positive integer specifying the number of records that
-        // the window extends back from the current record. Required. Use
-        // CurrentRow for offset zero and Following for negative offsets.
-        int64 offset = 1;
+        // Deprecated positive integer offset; use offset_expr instead.
+        // See https://substrait.io/expressions/window_functions/#offset-expressions
+        int64 offset = 1 [deprecated = true];
+
+        Expression offset_expr = 2;
       }
 
-      // Defines that the bound extends this far ahead of the current record.
+      // A bound toward later rows or values in the declared ordering.
       message Following {
-        // A strictly positive integer specifying the number of records that
-        // the window extends ahead of the current record. Required. Use
-        // CurrentRow for offset zero and Preceding for negative offsets.
-        int64 offset = 1;
+        // Deprecated positive integer offset; use offset_expr instead.
+        // See https://substrait.io/expressions/window_functions/#offset-expressions
+        int64 offset = 1 [deprecated = true];
+
+        Expression offset_expr = 2;
       }
 
-      // Defines that the bound extends to or from the current record.
+      // The current row or peer-group boundary, depending on the bound mode.
+      // See https://substrait.io/expressions/window_functions/#bound-modes
       message CurrentRow {}
 
-      // Defines an "unbounded bound": for lower bounds this means the start
-      // of the partition, and for upper bounds this means the end of the
-      // partition.
+      // The start of the partition for a lower bound; the end for an upper bound.
       message Unbounded {}
 
       oneof kind {
-        // The bound extends some number of records behind the current record.
+        // A bound toward earlier rows or values in the declared ordering.
         Preceding preceding = 1;
 
-        // The bound extends some number of records ahead of the current
-        // record.
+        // A bound toward later rows or values in the declared ordering.
         Following following = 2;
 
-        // The bound extends to the current record.
+        // The current row or peer-group boundary, depending on the bound mode.
         CurrentRow current_row = 3;
 
-        // The bound extends to the start of the partition or the end of the
-        // partition, depending on whether this represents the upper or lower
-        // bound.
+        // The start of the partition for a lower bound; the end for an upper bound.
         Unbounded unbounded = 4;
       }
     }
@@ -1459,7 +1596,7 @@ message Expression {
 
   // A reference that takes an existing subtype and selectively removes fields
   // from it. For example, one might initially have an inner struct with 100
-  // fields but a a particular operation only needs to interact with only 2 of
+  // fields but a particular operation only needs to interact with 2 of
   // those 100 fields. In this situation, one would use a mask expression to
   // eliminate the 98 fields that are not relevant to the rest of the operation
   // pipeline.
@@ -1526,8 +1663,11 @@ message Expression {
     }
   }
 
-  // A reference to an inner part of a complex object. Can reference reference a
-  // single element or a masked version of elements
+  // A reference to data within a structured object, supporting navigation into
+  // nested fields. The root_type specifies the origin of the data (input record,
+  // outer query, lambda parameters, or an arbitrary expression), and the
+  // reference_type specifies how to navigate from that root (either a direct
+  // path to a single element or a mask selecting multiple elements).
   message FieldReference {
     // Whether this is composed of a single element reference or a masked
     // element subtree
@@ -1536,24 +1676,49 @@ message Expression {
       MaskExpression masked_reference = 2;
     }
 
-    // Whether this reference has an origin of a root struct or is based on the
-    // ouput of an expression. When this is a RootReference and direct_reference
-    // above is used, the direct_reference must be of a type StructField.
+    // The origin of the data being referenced. When this is a RootReference and
+    // direct_reference above is used, the direct_reference must be of a type
+    // StructField.
     oneof root_type {
       Expression expression = 3;
       RootReference root_reference = 4;
       OuterReference outer_reference = 5;
+      LambdaParameterReference lambda_parameter_reference = 6;
     }
 
     // Singleton that expresses this FieldReference is rooted off the root
     // incoming record type
     message RootReference {}
 
-    // A root reference for the outer relation's subquery
+    // A root reference for the outer relation's subquery.
     message OuterReference {
-      // number of subquery boundaries to traverse up for this field's reference
-      //
-      // This value must be >= 1
+      oneof outer_reference_type {
+        // Number of subquery boundaries to traverse up for this field's
+        // reference. Must be >= 1.
+        // Deprecated: use `rel_reference` instead, which resolves the outer
+        // reference via the target relation's `RelCommon.rel_anchor` and is
+        // unambiguous even in plans with shared relations (`ReferenceRel`).
+        uint32 steps_out = 1 [deprecated = true];
+
+        // References the plan-wide unique rel_anchor of the relation that this
+        // field reference is rooted on. Must match a rel_anchor defined on a
+        // RelCommon in the plan. Must be >= 1. Must be used instead of steps_out
+        // when this outer reference appears inside a relation shared via
+        // ReferenceRel and offset-based resolution via steps_out would be ambiguous.
+        uint32 rel_reference = 2;
+      }
+    }
+
+    // A reference to a lambda parameter within a lambda body expression.
+    // This identifies which lambda scope to reference, treating its parameters
+    // as a struct. Use FieldReference with this as root_type to access specific
+    // parameters or nested fields within parameters.
+    message LambdaParameterReference {
+      // Number of lambda boundaries to traverse up for this reference.
+      // For nested lambdas:
+      //   0 = innermost lambda (current lambda's parameters as a struct)
+      //   1 = one lambda level out (outer lambda's parameters as a struct)
+      //   2 = two lambda levels out, etc.
       uint32 steps_out = 1;
     }
   }
@@ -1635,6 +1800,30 @@ message Expression {
       Rel right = 4;
     }
   }
+
+  // Expression that represents execution context dependent variables.
+  // These are modeled as expressions rather than functions because they:
+  // - Take no input arguments
+  // - Depend on execution context rather than input data
+  // - Require evaluation mode control (see ExecutionBehavior in plan.proto)
+  message ExecutionContextVariable {
+    oneof execution_context_variable_type {
+      // an execution context dependent variable containing the current
+      // timestamp in current_timezone
+      // nullability must be NULLABILITY_REQUIRED
+      Type.PrecisionTimestampTZ current_timestamp = 1;
+
+      // an execution context dependent variable containing the current
+      // session timezone as a string defined by IANA timezone database
+      // (https://www.iana.org/time-zones).
+      // nullability must be NULLABILITY_REQUIRED
+      Type.String current_timezone = 2;
+
+      // an execution context dependent variable containing the current date
+      // nullability must be NULLABILITY_REQUIRED
+      Type.Date current_date = 3;
+    }
+  }
 }
 
 // Expression that represents a dynamic parameter.
@@ -1644,6 +1833,7 @@ message DynamicParameter {
   Type type = 1;
 
   // The surrogate key used within a plan to reference a specific parameter binding.
+  // 0 is a valid anchor/reference, but prefer non-zero values for ergonomics.
   uint32 parameter_reference = 2;
 }
 
@@ -1653,6 +1843,7 @@ message SortField {
 
   oneof sort_kind {
     SortDirection direction = 2;
+    // References a function_anchor defined in this plan.
     uint32 comparison_function_reference = 3;
   }
   enum SortDirection {
@@ -1697,9 +1888,11 @@ enum AggregationPhase {
 
 // An aggregate function.
 message AggregateFunction {
+  reserved 2;
+  reserved "args";
+
   // Points to a function_anchor defined in this plan, which must refer
-  // to an aggregate function in the associated YAML file. Required; 0 is
-  // considered to be a valid anchor/reference.
+  // to an aggregate function in the associated YAML file. Required.
   uint32 function_reference = 1;
 
   // The arguments to be bound to the function. This must have exactly the
@@ -1711,17 +1904,13 @@ message AggregateFunction {
   //    overload is defined for.
   //  - Type arguments must be bound using FunctionArgument.type, and a
   //    function overload must be defined for that type.
-  //  - Enum arguments must be bound using FunctionArgument.enum
-  //    followed by Enum.specified, with a string that case-insensitively
-  //    matches one of the allowed options.
-  //  - Optional enum arguments must be bound using FunctionArgument.enum
-  //    followed by either Enum.specified or Enum.unspecified. If specified,
-  //    the string must case-insensitively match one of the allowed options.
+  //  - Enum arguments must be bound using FunctionArgument.enum, with a
+  //    string that case-insensitively matches one of the allowed options.
   repeated FunctionArgument arguments = 7;
 
-  // Options to specify behavior for corner cases, or leave behavior
-  // unspecified if the consumer does not need specific behavior in these
-  // cases.
+  // Optional behavioral preferences for the function call. Unlike
+  // arguments, these are not required and are not part of the function
+  // signature. If omitted, the consumer chooses its own behavior.
   repeated FunctionOption options = 8;
 
   // Must be set to the return type of the function, exactly as derived
@@ -1742,9 +1931,6 @@ message AggregateFunction {
   // Specifies whether equivalent records are merged before being aggregated.
   // Optional, defaults to AGGREGATION_INVOCATION_ALL.
   AggregationInvocation invocation = 6;
-
-  // deprecated; use arguments instead
-  repeated Expression args = 2 [deprecated = true];
 
   // Method in which equivalent records are merged before being aggregated.
   enum AggregationInvocation {

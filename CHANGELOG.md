@@ -1,6 +1,530 @@
 Release Notes
 ---
 
+## [0.107.0](https://github.com/substrait-io/substrait/compare/v0.106.0...v0.107.0) (2026-10-18)
+
+### ⚠ BREAKING CHANGES
+
+* **proto:** Moving `LambdaInvocation.lambda` into a `oneof`
+preserves the wire encoding of existing inline-lambda invocations but
+may break generated source APIs requiring code change around `oneof`
+access.
+
+<!-- Reviewable:start -->
+* **extensions:** the two-argument `subtract:ptstz_iyear` overload,
+`subtract(precision_timestamp_tz<P>, interval_year)`, deprecated in
+0.100.0, has been removed. Use the three-argument
+`subtract:ptstz_iyear_str` overload,
+`subtract(precision_timestamp_tz<P>, interval_year, string)`, and pass
+an explicit IANA timezone.
+
+### Features
+
+* **extensions:** remove deprecated subtract:ptstz_iyear overload ([#1262](https://github.com/substrait-io/substrait/issues/1262)) ([e56839f](https://github.com/substrait-io/substrait/commit/e56839f95f6976b844dc21d7b7f266d811ae1503))
+* **proto:** support detached relation subtrees ([#1236](https://github.com/substrait-io/substrait/issues/1236)) ([554bbfc](https://github.com/substrait-io/substrait/commit/554bbfc15e11013d9bbb713eda2f809309378cf9))
+* **proto:** support named lambdas ([#1221](https://github.com/substrait-io/substrait/issues/1221)) ([70e6b61](https://github.com/substrait-io/substrait/commit/70e6b617e7a603d56a56db29b05b420b904acfce)), closes [#1220](https://github.com/substrait-io/substrait/issues/1220)
+
+## [0.106.0](https://github.com/substrait-io/substrait/compare/v0.105.0...v0.106.0) (2026-10-11)
+
+### ⚠ BREAKING CHANGES
+
+* **extensions:** Removes the trailing origin value argument from the
+date and precision_time round_calendar implementations. Plans using the
+old compound signatures must use the new signatures without that
+trailing argument.
+
+### Bug Fixes
+
+* **extensions:** merge duplicate regexp function definitions ([#1215](https://github.com/substrait-io/substrait/issues/1215)) ([f11461b](https://github.com/substrait-io/substrait/commit/f11461b117b4fc20e8fcf2896567421379152339))
+* **extensions:** remove duplicate origin arguments from round_calendar ([#1191](https://github.com/substrait-io/substrait/issues/1191)) ([a6c0d55](https://github.com/substrait-io/substrait/commit/a6c0d5540467f3a39b3f0368070748cdc78592ba))
+
+## [0.105.0](https://github.com/substrait-io/substrait/compare/v0.104.0...v0.105.0) (2026-10-04)
+
+### ⚠ BREAKING CHANGES
+
+* **extensions:** `avg` over a decimal returns a nullable
+`DECIMAL?<38,S>`. A plan that declares the result required should
+declare it nullable.
+
+### Features
+
+* **extensions:** support file-level descriptions ([#1257](https://github.com/substrait-io/substrait/issues/1257)) ([2da7f00](https://github.com/substrait-io/substrait/commit/2da7f003eac1674a510d1597f51ce64d5fdaad34))
+* **proto:** support detached expression subtrees ([#1218](https://github.com/substrait-io/substrait/issues/1218)) ([795e693](https://github.com/substrait-io/substrait/commit/795e69359206d959ba994185cd93c1b887ea32b2)), closes [#1217](https://github.com/substrait-io/substrait/issues/1217)
+
+### Bug Fixes
+
+* **extensions:** make the decimal average nullable ([#1253](https://github.com/substrait-io/substrait/issues/1253)) ([30bc5cc](https://github.com/substrait-io/substrait/commit/30bc5ccf1035064c91bdbf5dfc0bf4461e88e2dd)), closes [#1252](https://github.com/substrait-io/substrait/issues/1252)
+
+## [0.104.0](https://github.com/substrait-io/substrait/compare/v0.103.1...v0.104.0) (2026-09-27)
+
+### ⚠ BREAKING CHANGES
+
+* **grammar:** Fixes the precedence of `!` and the associativity of
+the `? :` conditional when parsing return type expressions from
+extension YAMLs. This can be breaking for user defined extension YAMLs
+which may have relied on `!` binding looser than `AND` and `OR`, or on a
+chained `? :` grouping to the left; both now follow conventional
+precedence and associativity.
+
+### Features
+
+* add support for window function testing ([#1209](https://github.com/substrait-io/substrait/issues/1209)) ([d149822](https://github.com/substrait-io/substrait/commit/d14982226dd274cd4806985961afa88c361a0edd))
+
+### Bug Fixes
+
+* **grammar:** bind ! tighter than AND/OR and right-associate ? : ([#1228](https://github.com/substrait-io/substrait/issues/1228)) ([0f9b92b](https://github.com/substrait-io/substrait/commit/0f9b92bfb0958d10d7d9bb5faac82d1c2c2aa065))
+* **site:** track generated documentation inputs ([#1194](https://github.com/substrait-io/substrait/issues/1194)) ([930f109](https://github.com/substrait-io/substrait/commit/930f109319771229c9e60ed766afc15358b5f25b)), closes [#1144](https://github.com/substrait-io/substrait/issues/1144)
+* **tests:** remove byte-identical duplicate test case lines ([#1239](https://github.com/substrait-io/substrait/issues/1239)) ([5c6046b](https://github.com/substrait-io/substrait/commit/5c6046bf769850949b0f22e67a8739a83d430a3d))
+* **tests:** validate row shape matches column count in tables ([#1235](https://github.com/substrait-io/substrait/issues/1235)) ([b0341ce](https://github.com/substrait-io/substrait/commit/b0341cea26fd0a83eb2dfd8e9d4f64df1b8e1759))
+
+## [0.103.1](https://github.com/substrait-io/substrait/compare/v0.103.0...v0.103.1) (2026-09-20)
+
+### Bug Fixes
+
+* **extensions:** bind quantile return type ([#1193](https://github.com/substrait-io/substrait/issues/1193)) ([272d8dc](https://github.com/substrait-io/substrait/commit/272d8dc153ac980094d54b63660451d99eab9f89))
+
+## [0.103.0](https://github.com/substrait-io/substrait/compare/v0.102.0...v0.103.0) (2026-08-30)
+
+### ⚠ BREAKING CHANGES
+
+* **dialect:** dialect files declaring `EXTENSION_SINGLE`,
+`EXTENSION_MULTI` or `EXTENSION_LEAF` must now list the `message_types`
+they support, the same way `USER_DEFINED` types have to name their
+extension. `ExpandRel` support is declared with `CONSISTENT_FIELD`
+rather than `CONSTANT_FIELD`, which never named a protobuf member.
+
+### Features
+
+* **dialect:** check the dialect schema against the protos ([#1173](https://github.com/substrait-io/substrait/issues/1173)) ([b92e97c](https://github.com/substrait-io/substrait/commit/b92e97c3ca1a7f4b3f4c2f10295b7e842548027d))
+
+### Bug Fixes
+
+* **extensions:** split shared type parameters in strpos and logb ([#1186](https://github.com/substrait-io/substrait/issues/1186)) ([5a189e7](https://github.com/substrait-io/substrait/commit/5a189e7b86d7f017c1a31483d0d983bd7bfc3880))
+
+## [0.102.0](https://github.com/substrait-io/substrait/compare/v0.101.0...v0.102.0) (2026-08-23)
+
+### ⚠ BREAKING CHANGES
+
+* **protos:** deprecates the `offset` field of the `Preceding` and
+`Following` window bounds in favor of the new `offset_expr` field, which
+accepts an arbitrary expression instead of an integer literal. Consumers
+should add `offset_expr` support before producers switch to it. The PR
+also requires explicit window frame bounds type. Producers should set
+the bounds type and Consumers should reject `BOUNDS_TYPE_UNSPECIFIED` in
+such cases.
+ 
+<!-- Reviewable:start -->
+
+### Features
+
+* **extensions:** add a decimal overload for negate ([#1177](https://github.com/substrait-io/substrait/issues/1177)) ([6092523](https://github.com/substrait-io/substrait/commit/60925234a0a2c02a41400df349b0bad1e674581b))
+* **protos:** support expression in window aggregate bounds ([#1105](https://github.com/substrait-io/substrait/issues/1105)) ([6706015](https://github.com/substrait-io/substrait/commit/6706015ffdb19345fef399ef8238e3e6269cb380)), closes [#748](https://github.com/substrait-io/substrait/issues/748) [#617](https://github.com/substrait-io/substrait/issues/617) [#930](https://github.com/substrait-io/substrait/issues/930)
+
+## [0.101.0](https://github.com/substrait-io/substrait/compare/v0.100.0...v0.101.0) (2026-08-16)
+
+### ⚠ BREAKING CHANGES
+
+* **extensions:** `extensions/extension_types.yaml` and
+`extensions/type_variations.yaml` are no longer part of the extension
+catalog. They move to `site/examples/extensions/`, and their URNs change
+from `extension:io.substrait:extension_types` and
+`extension:io.substrait:type_variations` to
+`extension:org.example:extension_types` and
+`extension:org.example:type_variations`.
+
+Consumers that resolve `extension:io.substrait:extension_types` — the
+`point`/`line` user-defined types, which substrait-java and substrait-go
+both register today — will no longer find it in the catalog, and should
+either define those types locally or load the example explicitly under
+its new URN.
+
+The remaining example files keep their location but also move to the
+`extension:org.example:` owner, including
+`lambda_function_example.yaml`, which previously duplicated the official
+`extension:io.substrait:functions_list` URN.
+
+Nothing in the `extension:org.example:` namespace carries a
+compatibility guarantee: those files exist to illustrate the extension
+schema and to serve as parser fixtures, and may change without a
+deprecation cycle.
+* **protos:** `Expression.FieldReference.OuterReference.steps_out`
+is deprecated in favor of `rel_reference`, which names the binding
+relation via its plan-wide unique `RelCommon.rel_anchor` and therefore
+resolves unambiguously in DAG-shaped plans with shared relations
+(`ReferenceRel`), where counting subquery boundaries upward does not.
+Consumers should add `rel_reference` support before producers switch to
+it. Note that both fields are members of the same `outer_reference_type`
+oneof, so a plan cannot carry both forms at once: the migration is
+consumer-first rather than dual-write. Nothing is removed by this
+change: the deprecation is metadata only, consumers are not required to
+understand or validate it, and no existing plan changes meaning.
+`steps_out` remains fully functional and is scheduled for removal in a
+later release.
+
+### Features
+
+* **protos:** deprecate OuterReference.steps_out in favor of rel_reference ([#1132](https://github.com/substrait-io/substrait/issues/1132)) ([25940fb](https://github.com/substrait-io/substrait/commit/25940fb57d57dd8970112bc7d4b611012998eb52))
+
+### Bug Fixes
+
+* add missing RelCommon field to UpdateRel ([#1168](https://github.com/substrait-io/substrait/issues/1168)) ([cdf0102](https://github.com/substrait-io/substrait/commit/cdf0102f0d45e044cfa08a9a81174c5892f72f6a))
+
+### Code Refactoring
+
+* **extensions:** move example YAML files out of the extensions folder ([#1136](https://github.com/substrait-io/substrait/issues/1136)) ([c9f697e](https://github.com/substrait-io/substrait/commit/c9f697e6a1773e9d1248e87a2bd0fabe0c0e7906))
+
+## [0.100.0](https://github.com/substrait-io/substrait/compare/v0.99.0...v0.100.0) (2026-08-09)
+
+### ⚠ BREAKING CHANGES
+
+* **extensions:** the two-argument `subtract:ptstz_iyear` overload,
+`subtract(precision_timestamp_tz<P>, interval_year)`, is deprecated as of
+0.100.0. Use the three-argument `subtract:ptstz_iyear_str` overload,
+`subtract(precision_timestamp_tz<P>, interval_year, string)`, and pass an
+explicit IANA timezone instead. `interval_year` carries a number of months,
+and month arithmetic on an instant is only definable as field arithmetic on
+a civil datetime; the timezone is what maps the instant to that calendar,
+so the two-argument form has no well-defined result. This also aligns
+`subtract` with `add`, which offers only the three-argument form for this
+type combination. Nothing is removed by this change: the deprecation is
+metadata only, consumers are not required to understand or validate it, and
+no existing plan changes meaning. The overload is scheduled for removal in
+a later release.
+
+### Features
+
+* add advanced_extension to ExpandRel ([#1167](https://github.com/substrait-io/substrait/issues/1167)) ([4d5d57a](https://github.com/substrait-io/substrait/commit/4d5d57a1918edaacef529845dcc1d9664aa6068d))
+* **extensions:** add unsigned integer extension types (u8, u16, u32, u64) ([#953](https://github.com/substrait-io/substrait/issues/953)) ([f5e0715](https://github.com/substrait-io/substrait/commit/f5e0715454c4a7b54ed13efe018f590d1618623d))
+* **extensions:** deprecate subtract(precision_timestamp_tz, interval_year) overload ([#1160](https://github.com/substrait-io/substrait/issues/1160)) ([993ad15](https://github.com/substrait-io/substrait/commit/993ad15ca6c8b0dbcafef7316f48d83e20902dd2))
+
+### Bug Fixes
+
+* remove ignored nullability markers from MIRROR declarations ([#1148](https://github.com/substrait-io/substrait/issues/1148)) ([f77d2d4](https://github.com/substrait-io/substrait/commit/f77d2d4b0e0a1640fa323c7370ccfab8c15877ef))
+
+## [0.99.0](https://github.com/substrait-io/substrait/compare/v0.98.0...v0.99.0) (2026-07-26)
+
+### Features
+
+* add unbound type for partially bound plans ([#1081](https://github.com/substrait-io/substrait/issues/1081)) ([5153493](https://github.com/substrait-io/substrait/commit/5153493472805c4b07f1cb835c304b72805914ad))
+
+## [0.98.0](https://github.com/substrait-io/substrait/compare/v0.97.0...v0.98.0) (2026-07-19)
+
+### ⚠ BREAKING CHANGES
+
+* **protos:** The deprecated `left_keys` and `right_keys` fields have
+been removed from `HashJoinRel` and `MergeJoinRel`. Producers must use
+the `keys` field instead.
+* **protos:** The deprecated `offset` and `count` fields have been
+removed from `FetchRel`. Producers must use `offset_expr` and
+`count_expr` instead.
+* **protos:** remove deprecated VirtualTable.values field (#1131)
+* **protos:** remove deprecated IntervalDayToSecond.microseconds field (#1116)
+
+### Features
+
+* **protos:** remove deprecated IntervalDayToSecond.microseconds field ([#1116](https://github.com/substrait-io/substrait/issues/1116)) ([a4ad9f4](https://github.com/substrait-io/substrait/commit/a4ad9f4208e827be845ecf3e307f58277e2cfc0f))
+* **protos:** remove deprecated left_keys/right_keys from join rels ([#1129](https://github.com/substrait-io/substrait/issues/1129)) ([08b2736](https://github.com/substrait-io/substrait/commit/08b27364728822bf00bf13a82998f09f1c4b96d7))
+* **protos:** remove deprecated offset/count from FetchRel ([#1130](https://github.com/substrait-io/substrait/issues/1130)) ([b7e8d02](https://github.com/substrait-io/substrait/commit/b7e8d027e01e21656ab498d23db4335098f50745))
+* **protos:** remove deprecated VirtualTable.values field ([#1131](https://github.com/substrait-io/substrait/issues/1131)) ([7b0bd66](https://github.com/substrait-io/substrait/commit/7b0bd664b5e09bf6a230742b17511716040a9d21))
+
+### Bug Fixes
+
+* **tests:** correct decimal sum and nullif results ([#1048](https://github.com/substrait-io/substrait/issues/1048)) ([a750c25](https://github.com/substrait-io/substrait/commit/a750c25c3bd3c9e82fb10f1c1bbf3d0a273a0f46))
+
+## [0.97.0](https://github.com/substrait-io/substrait/compare/v0.96.0...v0.97.0) (2026-07-12)
+
+### ⚠ BREAKING CHANGES
+
+* **protos:** An unset `IntervalDay.precision` no longer has a
+defined meaning. Previously an unset precision was treated as `6`
+(microseconds); implementations should now reject an unset precision
+instead of applying a default. Producers must set `precision`
+explicitly.
+
+### Features
+
+* **protos:** require explicit interval precision and allow picoseconds ([#1110](https://github.com/substrait-io/substrait/issues/1110)) ([858397d](https://github.com/substrait-io/substrait/commit/858397de179721218bb5ca4a329121ee053e9cab))
+
+## [0.96.0](https://github.com/substrait-io/substrait/compare/v0.95.0...v0.96.0) (2026-07-05)
+
+### Features
+
+* introduce LateralJoinRel for a correlated subquery evaluation ([#973](https://github.com/substrait-io/substrait/issues/973)) ([3ae33e7](https://github.com/substrait-io/substrait/commit/3ae33e7a46bfcda61d1c9acb11c88e0094e5d5c0)), closes [#1031](https://github.com/substrait-io/substrait/issues/1031)
+
+## [0.95.0](https://github.com/substrait-io/substrait/compare/v0.94.0...v0.95.0) (2026-06-28)
+
+### ⚠ BREAKING CHANGES
+
+* **grammar:** Fixes operator precedence when parsing return type expressions from extension YAMLs. This can be breaking for user defined extensions YAMLs which may have relied on the faulty operator precedence parsing behavior which is now fixed to use conventional operator precedence.
+* **protos:** removes deprecated Type.user_defined_type_reference field
+
+### Features
+
+* **protos:** remove deprecated Type.user_defined_type_reference field ([#1095](https://github.com/substrait-io/substrait/issues/1095)) ([0cdad6d](https://github.com/substrait-io/substrait/commit/0cdad6dedee6623ac778a67e5be520fc9bc5f06c))
+
+### Bug Fixes
+
+* **grammar:** give binary operators conventional precedence ([#1107](https://github.com/substrait-io/substrait/issues/1107)) ([d4eee3d](https://github.com/substrait-io/substrait/commit/d4eee3dad3702d4e767fe32b987777fb1aac8eb5))
+
+## [0.94.0](https://github.com/substrait-io/substrait/compare/v0.93.0...v0.94.0) (2026-06-14)
+
+### Features
+
+* allow for function composition in test cases ([#1088](https://github.com/substrait-io/substrait/issues/1088)) ([4e1ee3e](https://github.com/substrait-io/substrait/commit/4e1ee3ebb886a5c239dfa9804cd0917f1407de8c))
+* **tests:** support user-defined type literals in test cases ([#1098](https://github.com/substrait-io/substrait/issues/1098)) ([5ff4dc4](https://github.com/substrait-io/substrait/commit/5ff4dc4aa4c06f7a551e44ea026ad2f300b56629))
+
+## [0.93.0](https://github.com/substrait-io/substrait/compare/v0.92.1...v0.93.0) (2026-06-07)
+
+### ⚠ BREAKING CHANGES
+
+* **protos:** removes deprecated Expression.Enum message
+* **protos:** removed args field from ScalarFunction
+* **protos:** removed args field from AggregateFunction
+* **protos:** removed args field from WindowFunction
+
+### Features
+
+* **protos:** remove deprecated args fields ([#1085](https://github.com/substrait-io/substrait/issues/1085)) ([d90dfcb](https://github.com/substrait-io/substrait/commit/d90dfcbc84c02f3c7359f70291130d13be4bd9ec))
+* **protos:** remove deprecated Expression.Enum message ([#1086](https://github.com/substrait-io/substrait/issues/1086)) ([f149482](https://github.com/substrait-io/substrait/commit/f14948240c9150708334673de2dfc3643ef3f03b))
+
+## [0.92.1](https://github.com/substrait-io/substrait/compare/v0.92.0...v0.92.1) (2026-05-31)
+
+### Bug Fixes
+
+* **grammar:** align type expressions with extension YAML ([#1082](https://github.com/substrait-io/substrait/issues/1082)) ([254a482](https://github.com/substrait-io/substrait/commit/254a48247296e90f576a778696431d606a1ec4e1))
+
+## [0.92.0](https://github.com/substrait-io/substrait/compare/v0.91.0...v0.92.0) (2026-05-24)
+
+### Features
+
+* **tests:** support map and struct literals ([#1077](https://github.com/substrait-io/substrait/issues/1077)) ([21ab33c](https://github.com/substrait-io/substrait/commit/21ab33c24057ccaf4b4101f9ceefdee14222f46d))
+
+## [0.91.0](https://github.com/substrait-io/substrait/compare/v0.90.0...v0.91.0) (2026-05-17)
+
+### ⚠ BREAKING CHANGES
+
+* **extensions:** changes the return type of the `subtract:date_iday`
+function from `date` to `precision_timestamp`
+
+### Features
+
+* clarify post_join_filter. add residual_expressions to hash join and merge join ([#1044](https://github.com/substrait-io/substrait/issues/1044)) ([f7b939c](https://github.com/substrait-io/substrait/commit/f7b939cd687cde40ae6cd5d495880a6050d451b0)), closes [#807](https://github.com/substrait-io/substrait/issues/807)
+* **docs:** clarify distinction between enumeration arguments and options ([#1005](https://github.com/substrait-io/substrait/issues/1005)) ([51ff9fa](https://github.com/substrait-io/substrait/commit/51ff9fa72212f38abf330a2d8922f3ad2a7ea093))
+
+### Bug Fixes
+
+* **extensions:** correct return type for subtract:date_iday operation ([#1029](https://github.com/substrait-io/substrait/issues/1029)) ([26fbd04](https://github.com/substrait-io/substrait/commit/26fbd041ebf1f688c28ef9a66a50583dc71aaecd))
+
+## [0.90.0](https://github.com/substrait-io/substrait/compare/v0.89.0...v0.90.0) (2026-05-11)
+
+### Features
+
+* clarify interaction between nullability binding and any type parameters ([#960](https://github.com/substrait-io/substrait/issues/960)) ([a9a0c95](https://github.com/substrait-io/substrait/commit/a9a0c95228fa38ac9dede123e7cfa409d1f864a5))
+
+### Bug Fixes
+
+* **tests:** make typed temporal test literals unquoted ([#1064](https://github.com/substrait-io/substrait/issues/1064)) ([d752b32](https://github.com/substrait-io/substrait/commit/d752b32dae2aa2f5f16e081937c440520bbf884a))
+
+## [0.89.0](https://github.com/substrait-io/substrait/compare/v0.88.1...v0.89.0) (2026-05-03)
+
+### ⚠ BREAKING CHANGES
+
+* NOT A REAL BREAKING CHANGE. OuterReference.steps_out
+field is now under oneof -- implicit optional to explicit optional. This
+is not a real breaking change as Substrait always required non-zero
+value.
+
+Add optional RelCommon.id field and OuterReference.id_reference to
+support unambiguous outer reference resolution in plans with common
+subexpressions (ReferenceRel). The existing steps_out offset-based
+mechanism remains for backward compatibility with tree-shaped plans.
+
+The `RelCommon.rel_anchor` can be used for other purpose but for now
+only required when it is used to resolve outer reference.
+
+### Features
+
+* add id-based outer reference resolution for DAG plans ([#1031](https://github.com/substrait-io/substrait/issues/1031)) ([ad664dc](https://github.com/substrait-io/substrait/commit/ad664dc9a4bc1a368ab8d2940084c77cdb7d9213)), closes [#1024](https://github.com/substrait-io/substrait/issues/1024)
+
+## [0.88.1](https://github.com/substrait-io/substrait/compare/v0.88.0...v0.88.1) (2026-04-19)
+
+### Bug Fixes
+
+* **tests:** use correct compact table row format in std_dev and variance tests ([#1043](https://github.com/substrait-io/substrait/issues/1043)) ([357d639](https://github.com/substrait-io/substrait/commit/357d639591b9e7818e17b1bca5a7ede904351bd3))
+
+## [0.88.0](https://github.com/substrait-io/substrait/compare/v0.87.0...v0.88.0) (2026-04-12)
+
+### ⚠ BREAKING CHANGES
+
+* **extensions:** deprecates the function signatures for std_dev and
+variance using function options in favor of the versions using enum
+arguments
+
+Signed-off-by: Niels Pardon <par@zurich.ibm.com>
+* **dialect:** explicitly defines the maximum length of `FIXEDBINARY`
+in the documentation which was already existent in the protobuf
+specification due to the use of `int32` for the `length` argument
+
+- adds `max_length` for `FIXED_BINARY`, `VARCHAR`, `FIXED_CHAR` to the
+dialect schema
+- adds `max_precision` and `max_scale` for `DECIMAL` to the dialect
+schema
+- updated the documentation to mention the maximum length for
+`FIXEDBINARY` which is given by the [use of `int32` for the `length`
+field in the
+proto](https://github.com/substrait-io/substrait/blob/7cceb8369cd533134431979835124de5634a4a47/proto/substrait/type.proto#L178-L179)
+
+follow-up to https://github.com/substrait-io/substrait/pull/961
+fixes https://github.com/substrait-io/substrait/issues/965
+* removes the deprecated `time`, `timestamp` and
+`timestamp_tz` types from:
+
+- proto files
+- dialect schema
+- extension yamls
+- ANTLR grammar
+- test cases
+- coverage python code
+- documentation
+* removed Aggregate.Grouping.grouping_expressions field
+
+### Features
+
+* add TopNRel physical operator with WITH TIES support ([#1009](https://github.com/substrait-io/substrait/issues/1009)) ([6cf8ff3](https://github.com/substrait-io/substrait/commit/6cf8ff3f63eacc81460be38afd41814b89c5d39f))
+* **dialect:** support max length, scale, precision for parameterized types ([#1030](https://github.com/substrait-io/substrait/issues/1030)) ([edaed64](https://github.com/substrait-io/substrait/commit/edaed64c7b64b69a0bb22ce7bc965d7513a5ca91))
+* **extensions:** deprecate std_dev and variance using function options ([#1019](https://github.com/substrait-io/substrait/issues/1019)) ([fc6ab3c](https://github.com/substrait-io/substrait/commit/fc6ab3cc3bb189f47e525db7f4b0c8a94b7b69f9))
+* remove deprecated time, timestamp and timestamp_tz types ([#994](https://github.com/substrait-io/substrait/issues/994)) ([87d73b6](https://github.com/substrait-io/substrait/commit/87d73b663bcc153f9dda7dfe574dca36b1e4ed28)), closes [#980](https://github.com/substrait-io/substrait/issues/980)
+* removed AggregateRel.Grouping.grouping_expressions ([#1002](https://github.com/substrait-io/substrait/issues/1002)) ([c82f39a](https://github.com/substrait-io/substrait/commit/c82f39a077c23107e069a3e93eda97fd7b583555))
+* **tests:** use URN instead of path for extension references ([#1028](https://github.com/substrait-io/substrait/issues/1028)) ([dd25f77](https://github.com/substrait-io/substrait/commit/dd25f77278820ede469b185399e048215b907b56))
+
+## [0.87.0](https://github.com/substrait-io/substrait/compare/v0.86.0...v0.87.0) (2026-03-29)
+
+### Features
+
+* **extensions:** add std_dev and variance with distribution enum arg  ([#1011](https://github.com/substrait-io/substrait/issues/1011)) ([00bc3c2](https://github.com/substrait-io/substrait/commit/00bc3c24078443a23b3b4c92228fae8e2aba3778))
+* introduce ExecutionContextVariable and ExecutionBehaviour [#945](https://github.com/substrait-io/substrait/issues/945)) ([6b98c27](https://github.com/substrait-io/substrait/commit/6b98c27f10c9cefb221cd50555877597e83407aa))
+* **tests:** add enum argument support to FuncTestCase grammar ([#1010](https://github.com/substrait-io/substrait/issues/1010)) ([7b39d4c](https://github.com/substrait-io/substrait/commit/7b39d4ca8651e0ac0613efd9e72b36095dfbea99))
+
+## [0.86.0](https://github.com/substrait-io/substrait/compare/v0.85.0...v0.86.0) (2026-03-22)
+
+### ⚠ BREAKING CHANGES
+
+* **extensions:** random extraneous argument for repeat varchar (#1015)
+* **extensions:** corrects the return type of the `add:date_iyear`
+
+### Features
+
+* add optional description field to function implementations ([#1013](https://github.com/substrait-io/substrait/issues/1013)) ([0f4c774](https://github.com/substrait-io/substrait/commit/0f4c774f0bca5d6476cd36aaaf1390fbc323fc13))
+* **extensions:** support deprecation info in extensions ([#1014](https://github.com/substrait-io/substrait/issues/1014)) ([25d87ef](https://github.com/substrait-io/substrait/commit/25d87ef4b9d8803bda2644eff48dfe966a6d7464))
+
+### Bug Fixes
+
+* enforce nullable types for null literals in test cases ([#989](https://github.com/substrait-io/substrait/issues/989)) ([ba9b0ff](https://github.com/substrait-io/substrait/commit/ba9b0ff98e1caf0b4f5c965a7bbc02f30021ea95))
+* **extensions:** correct return type for `add:date_iyear` operation ([#1007](https://github.com/substrait-io/substrait/issues/1007)) ([62147cf](https://github.com/substrait-io/substrait/commit/62147cf26b4020ee8433f506809f410cc40d5806))
+* **extensions:** random extraneous argument for repeat varchar ([#1015](https://github.com/substrait-io/substrait/issues/1015)) ([271d7bb](https://github.com/substrait-io/substrait/commit/271d7bbbae2dcdbdc125ff0d7e9637f318f70b59))
+
+## [0.85.0](https://github.com/substrait-io/substrait/compare/v0.84.0...v0.85.0) (2026-03-06)
+
+### ⚠ BREAKING CHANGES
+
+* drops uri fields from protobufs
+
+### Features
+
+* only use urns for referencing simple extensions ([#971](https://github.com/substrait-io/substrait/issues/971)) ([ada68a8](https://github.com/substrait-io/substrait/commit/ada68a84698d269040a0d365c9e6c141fc3b2c29))
+
+## [0.84.0](https://github.com/substrait-io/substrait/compare/v0.83.0...v0.84.0) (2026-03-06)
+
+### Features
+
+* add common list functions to core extensions ([#969](https://github.com/substrait-io/substrait/issues/969)) ([609cad7](https://github.com/substrait-io/substrait/commit/609cad7330ea08c851e1069ba70fb56ebca19008))
+* add metadata fields to dialect schema ([#966](https://github.com/substrait-io/substrait/issues/966)) ([0fbf52e](https://github.com/substrait-io/substrait/commit/0fbf52e4623f72a7d85625a7f8e48b098447385a))
+* **proto:** deprecate time type and literal ([#985](https://github.com/substrait-io/substrait/issues/985)) ([dc27654](https://github.com/substrait-io/substrait/commit/dc276549da20d92aa83269219ae267682d55dba4))
+* support null list types and nested list literals in tests ([#991](https://github.com/substrait-io/substrait/issues/991)) ([e2dca29](https://github.com/substrait-io/substrait/commit/e2dca291fb9061a38bbd03574f11a85b56f96c28))
+
+### Bug Fixes
+
+* **grammar:** remove redundant import of SubstraitLexer in FuncTestCaseParser ([#982](https://github.com/substrait-io/substrait/issues/982)) ([9dd1f05](https://github.com/substrait-io/substrait/commit/9dd1f057392181208573edf2485a466c13a874d3))
+
+## [0.83.0](https://github.com/substrait-io/substrait/compare/v0.82.0...v0.83.0) (2026-03-01)
+
+### Features
+
+* **dialect:** support specifying maximum supported subsecond precision ([#961](https://github.com/substrait-io/substrait/issues/961)) ([e559368](https://github.com/substrait-io/substrait/commit/e5593685d5c7036fe67542bf7b46e6a3ee5e4a1d))
+
+### Bug Fixes
+
+* **grammar:** add IntervalCompound to ANTLR grammar ([#963](https://github.com/substrait-io/substrait/issues/963)) ([2705258](https://github.com/substrait-io/substrait/commit/2705258137b7272830cf00680e6f3a36b8d3ed4b))
+
+## [0.82.0](https://github.com/substrait-io/substrait/compare/v0.81.0...v0.82.0) (2026-02-22)
+
+### ⚠ BREAKING CHANGES
+
+* removes capabilities.proto and corresponding
+documentation
+
+Signed-off-by: Niels Pardon <par@zurich.ibm.com>
+
+### Features
+
+* remove capabilities.proto ([#952](https://github.com/substrait-io/substrait/issues/952)) ([23ac2f3](https://github.com/substrait-io/substrait/commit/23ac2f30e03a8d28f76e445bcd439064f3d688fd))
+
+## [0.81.0](https://github.com/substrait-io/substrait/compare/v0.80.0...v0.81.0) (2026-02-08)
+
+### ⚠ BREAKING CHANGES
+
+* I would propose to remove these proto definitions if
+they are not used / no longer part of the spec.
+
+### Features
+
+* remove unused function.proto, parameterized_types.proto, type_expressions.proto ([#940](https://github.com/substrait-io/substrait/issues/940)) ([788faab](https://github.com/substrait-io/substrait/commit/788faab7fdcc42742f5f2cb83294dd6966804109))
+
+### Bug Fixes
+
+* add missing visit methods in TestCaseVisitor ([#958](https://github.com/substrait-io/substrait/issues/958)) ([09e7c18](https://github.com/substrait-io/substrait/commit/09e7c180b32ebbd153a66e8fd78eec11d5aad386))
+
+## [0.80.0](https://github.com/substrait-io/substrait/compare/v0.79.0...v0.80.0) (2026-01-18)
+
+### Features
+
+* add optional metadata to simple extension yaml files ([#922](https://github.com/substrait-io/substrait/issues/922)) ([0ef31ac](https://github.com/substrait-io/substrait/commit/0ef31ac4572b3e03fd8ad86346db451f08ce17cd))
+
+## [0.79.0](https://github.com/substrait-io/substrait/compare/v0.78.2...v0.79.0) (2025-12-21)
+
+### Features
+
+* introduce lambda expressions ([#889](https://github.com/substrait-io/substrait/issues/889)) ([e47197c](https://github.com/substrait-io/substrait/commit/e47197c8de012ac6db4329ad7c68caeb746c5951))
+
+### Bug Fixes
+
+* remove redundant nullability markers in test case grammar ([#910](https://github.com/substrait-io/substrait/issues/910)) ([6ad9251](https://github.com/substrait-io/substrait/commit/6ad9251f27f4760936b9fb84edba8378be593ae4))
+
+## [0.78.2](https://github.com/substrait-io/substrait/compare/v0.78.1...v0.78.2) (2025-12-14)
+
+### Bug Fixes
+
+* **extensions:** nullif output should always be nullable ([#913](https://github.com/substrait-io/substrait/issues/913)) ([7e0404b](https://github.com/substrait-io/substrait/commit/7e0404ba8540bcd910bb652d67baeab86a69ccab))
+
+## [0.78.1](https://github.com/substrait-io/substrait/compare/v0.78.0...v0.78.1) (2025-11-23)
+
+### Bug Fixes
+
+* remove invalid equal function test ([#893](https://github.com/substrait-io/substrait/issues/893)) ([9533cfe](https://github.com/substrait-io/substrait/commit/9533cfe79449cb4504d934ccb76a2d6026123f43))
+
+## [0.78.0](https://github.com/substrait-io/substrait/compare/v0.77.0...v0.78.0) (2025-11-16)
+
+### ⚠ BREAKING CHANGES
+
+* `type_reference` with value **0** is encoded
+differently on wire. However, the usage of `type_reference` in generated
+consumer code does not break in practice. **New consumer should consider
+`type_reference` is set to zero when no oneof is set.** See [Wire
+
+### Features
+
+* support type alias in user defined literal ([#868](https://github.com/substrait-io/substrait/issues/868)) ([cd99f03](https://github.com/substrait-io/substrait/commit/cd99f033ec3cf8170d5e76affe31f3262f60d4e7)), closes [#Wire-Encoding-Change](https://github.com/substrait-io/substrait/issues/Wire-Encoding-Change) [#857](https://github.com/substrait-io/substrait/issues/857)
+
 ## [0.77.0](https://github.com/substrait-io/substrait/compare/v0.76.0...v0.77.0) (2025-10-05)
 
 ### Features

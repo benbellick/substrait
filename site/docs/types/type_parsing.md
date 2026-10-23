@@ -37,7 +37,7 @@ Structs are unique from other types because they have an arbitrary number of par
 
     ```
     // Struct
-    struct?<string, i8, i32?, timestamp_tz>
+    struct?<string, i8, i32?, precision_timestamp_tz<6>>
 
     // Named structs are not yet supported in the text format.
     ```
@@ -65,3 +65,59 @@ Similar to structs, maps and lists can also have a type as one of their paramete
     list<struct<string, i32>>
     map<i32?, list<map<i32, string?>>>
     ```
+
+### User-Defined Types
+
+[User-defined types](type_classes.md#user-defined-types) must be referenced using the `u!` prefix followed by the type name:
+
+=== "YAML"
+
+    ```
+    u!typename
+    ```
+
+=== "Example"
+
+    ```yaml
+    types:
+      - name: point
+    scalar_functions:
+      - name: distance
+        impls:
+          - args:
+            - name: p
+              value: u!point
+            return: fp64
+    ```
+
+In simple extension YAML, user-defined types from another extension may be referenced by prefixing the `u!` reference with a dependency alias declared in the file's `dependencies` map:
+
+=== "YAML"
+
+    ```
+    dependency_alias.u!typename
+    ```
+
+=== "Example"
+
+    ```yaml
+    --8<-- "examples/extensions/distance_functions.yaml"
+    ```
+
+### Function Types
+
+Function types represent anonymous functions with typed parameters and return values. They are used in higher-order functions that operate on collections.
+
+In YAML extension definitions, function types use the `func` keyword:
+
+```
+# Single parameter - both forms are equivalent
+func<any1 -> any2>
+func<(any1) -> any2>
+
+# Multiple parameters - parentheses required
+func<(any1, any2) -> any3>
+func<(any1, any2, any3) -> any4>
+```
+
+Function types use the arrow syntax (`->`) to separate parameter types from the return type. For multiple parameters, use parentheses to group the parameter types. See [Lambda Expressions](../expressions/lambda_expressions.md) for more details on lambda expressions and their usage.

@@ -1,6 +1,8 @@
 %YAML 1.2
 ---
 urn: extension:io.substrait:functions_datetime
+description: >
+  Date, time, timestamp, and interval functions.
 scalar_functions:
   -
     name: extract
@@ -64,25 +66,14 @@ scalar_functions:
       indexing option cannot be specified when the component is YEAR, ISO_YEAR, US_YEAR, HOUR, MINUTE, SECOND,
       MILLISECOND, MICROSECOND, SUBSECOND, UNIX_TIME, or TIMEZONE_OFFSET.
 
-      Timezone strings must be as defined by IANA timezone database (https://www.iana.org/time-zones).
+      Timezone strings must be specified as defined by IANA timezone database (https://www.iana.org/time-zones).
       Examples: "Pacific/Marquesas", "Etc/GMT+1".
       If timezone is invalid an error is thrown.
     impls:
       - args:
           - name: component
             options: [ YEAR, ISO_YEAR, US_YEAR, HOUR, MINUTE, SECOND,
-                       MILLISECOND, MICROSECOND, SUBSECOND, PICOSECOND, UNIX_TIME, TIMEZONE_OFFSET ]
-            description: The part of the value to extract.
-          - name: x
-            value: timestamp_tz
-          - name: timezone
-            description: Timezone string from IANA tzdb.
-            value: string
-        return: i64
-      - args:
-          - name: component
-            options: [ YEAR, ISO_YEAR, US_YEAR, HOUR, MINUTE, SECOND,
-                       MILLISECOND, MICROSECOND, NANOSECOND, PICOSECOND, SUBSECOND, UNIX_TIME, TIMEZONE_OFFSET ]
+                        MILLISECOND, MICROSECOND, NANOSECOND, PICOSECOND, SUBSECOND, UNIX_TIME, TIMEZONE_OFFSET ]
             description: The part of the value to extract.
           - name: x
             value: precision_timestamp_tz<P>
@@ -93,15 +84,7 @@ scalar_functions:
       - args:
           - name: component
             options: [ YEAR, ISO_YEAR, US_YEAR, HOUR, MINUTE, SECOND,
-                       MILLISECOND, MICROSECOND, SUBSECOND, UNIX_TIME ]
-            description: The part of the value to extract.
-          - name: x
-            value: timestamp
-        return: i64
-      - args:
-          - name: component
-            options: [ YEAR, ISO_YEAR, US_YEAR, HOUR, MINUTE, SECOND,
-                       MILLISECOND, MICROSECOND, NANOSECOND, SUBSECOND, UNIX_TIME ]
+                        MILLISECOND, MICROSECOND, NANOSECOND, SUBSECOND, UNIX_TIME ]
             description: The part of the value to extract.
           - name: x
             value: precision_timestamp<P>
@@ -118,26 +101,12 @@ scalar_functions:
             options: [ HOUR, MINUTE, SECOND, MILLISECOND, MICROSECOND, SUBSECOND ]
             description: The part of the value to extract.
           - name: x
-            value: time
+            value: precision_time<P>
         return: i64
       - args:
           - name: component
             options: [ QUARTER, MONTH, DAY, DAY_OF_YEAR, MONDAY_DAY_OF_WEEK,
-                       SUNDAY_DAY_OF_WEEK, MONDAY_WEEK, SUNDAY_WEEK, ISO_WEEK, US_WEEK ]
-            description: The part of the value to extract.
-          - name: indexing
-            options: [ ONE, ZERO ]
-            description: Start counting from 1 or 0.
-          - name: x
-            value: timestamp_tz
-          - name: timezone
-            description: Timezone string from IANA tzdb.
-            value: string
-        return: i64
-      - args:
-          - name: component
-            options: [ QUARTER, MONTH, DAY, DAY_OF_YEAR, MONDAY_DAY_OF_WEEK,
-                       SUNDAY_DAY_OF_WEEK, MONDAY_WEEK, SUNDAY_WEEK, ISO_WEEK, US_WEEK ]
+                        SUNDAY_DAY_OF_WEEK, MONDAY_WEEK, SUNDAY_WEEK, ISO_WEEK, US_WEEK ]
             description: The part of the value to extract.
           - name: indexing
             options: [ ONE, ZERO ]
@@ -151,18 +120,7 @@ scalar_functions:
       - args:
           - name: component
             options: [ QUARTER, MONTH, DAY, DAY_OF_YEAR, MONDAY_DAY_OF_WEEK,
-                       SUNDAY_DAY_OF_WEEK, MONDAY_WEEK, SUNDAY_WEEK, ISO_WEEK, US_WEEK ]
-            description: The part of the value to extract.
-          - name: indexing
-            options: [ ONE, ZERO ]
-            description: Start counting from 1 or 0.
-          - name: x
-            value: timestamp
-        return: i64
-      - args:
-          - name: component
-            options: [ QUARTER, MONTH, DAY, DAY_OF_YEAR, MONDAY_DAY_OF_WEEK,
-                       SUNDAY_DAY_OF_WEEK, MONDAY_WEEK, SUNDAY_WEEK, ISO_WEEK, US_WEEK ]
+                        SUNDAY_DAY_OF_WEEK, MONDAY_WEEK, SUNDAY_WEEK, ISO_WEEK, US_WEEK ]
             description: The part of the value to extract.
           - name: indexing
             options: [ ONE, ZERO ]
@@ -173,7 +131,7 @@ scalar_functions:
       - args:
           - name: component
             options: [ QUARTER, MONTH, DAY, DAY_OF_YEAR, MONDAY_DAY_OF_WEEK,
-                       SUNDAY_DAY_OF_WEEK, MONDAY_WEEK, SUNDAY_WEEK, ISO_WEEK, US_WEEK ]
+                        SUNDAY_DAY_OF_WEEK, MONDAY_WEEK, SUNDAY_WEEK, ISO_WEEK, US_WEEK ]
             description: The part of the value to extract.
           - name: indexing
             options: [ ONE, ZERO ]
@@ -189,7 +147,7 @@ scalar_functions:
       * IS_DST Return true if DST (Daylight Savings Time) is observed at the given value
         in the given timezone.
 
-      Timezone strings must be as defined by IANA timezone database (https://www.iana.org/time-zones).
+      Timezone strings must be specified as defined by IANA timezone database (https://www.iana.org/time-zones).
       Examples: "Pacific/Marquesas", "Etc/GMT+1".
       If timezone is invalid an error is thrown.
     impls:
@@ -198,24 +156,7 @@ scalar_functions:
             options: [ IS_LEAP_YEAR ]
             description: The part of the value to extract.
           - name: x
-            value: timestamp
-        return: boolean
-      - args:
-          - name: component
-            options: [ IS_LEAP_YEAR ]
-            description: The part of the value to extract.
-          - name: x
             value: precision_timestamp<P>
-        return: boolean
-      - args:
-          - name: component
-            options: [ IS_LEAP_YEAR, IS_DST ]
-            description: The part of the value to extract.
-          - name: x
-            value: timestamp_tz
-          - name: timezone
-            description: Timezone string from IANA tzdb.
-            value: string
         return: boolean
       - args:
           - name: component
@@ -239,31 +180,16 @@ scalar_functions:
     description: >-
       Add an interval to a date/time type.
 
-      Timezone strings must be as defined by IANA timezone database (https://www.iana.org/time-zones).
+      Timezone strings must be specified as defined by IANA timezone database (https://www.iana.org/time-zones).
       Examples: "Pacific/Marquesas", "Etc/GMT+1".
       If timezone is invalid an error is thrown.
     impls:
       - args:
           - name: x
-            value: timestamp
-          - name: y
-            value: interval_year
-        return: timestamp
-      - args:
-          - name: x
             value: precision_timestamp<P>
           - name: y
             value: interval_year
         return: precision_timestamp<P>
-      - args:
-          - name: x
-            value: timestamp_tz
-          - name: y
-            value: interval_year
-          - name: timezone
-            description: Timezone string from IANA tzdb.
-            value: string
-        return: timestamp_tz
       - args:
           - name: x
             value: precision_timestamp_tz<P>
@@ -278,25 +204,13 @@ scalar_functions:
             value: date
           - name: y
             value: interval_year
-        return: timestamp
-      - args:
-          - name: x
-            value: timestamp
-          - name: y
-            value: interval_day<P>
-        return: timestamp
+        return: date
       - args:
           - name: x
             value: precision_timestamp<P>
           - name: y
             value: interval_day<P>
         return: precision_timestamp<P>
-      - args:
-          - name: x
-            value: timestamp_tz
-          - name: y
-            value: interval_day<P>
-        return: timestamp_tz
       - args:
           - name: x
             value: precision_timestamp_tz<P>
@@ -308,7 +222,7 @@ scalar_functions:
             value: date
           - name: y
             value: interval_day<P>
-        return: timestamp
+        return: precision_timestamp<P>
   -
     name: "multiply"
     description: Multiply an interval by an integral number.
@@ -382,43 +296,16 @@ scalar_functions:
     description: >-
       Subtract an interval from a date/time type.
 
-      Timezone strings must be as defined by IANA timezone database (https://www.iana.org/time-zones).
+      Timezone strings must be specified as defined by IANA timezone database (https://www.iana.org/time-zones).
       Examples: "Pacific/Marquesas", "Etc/GMT+1".
       If timezone is invalid an error is thrown.
     impls:
       - args:
           - name: x
-            value: timestamp
-          - name: y
-            value: interval_year
-        return: timestamp
-      - args:
-          - name: x
             value: precision_timestamp<P>
           - name: y
             value: interval_year
         return: precision_timestamp<P>
-      - args:
-          - name: x
-            value: timestamp_tz
-          - name: y
-            value: interval_year
-        return: timestamp_tz
-      - args:
-          - name: x
-            value: precision_timestamp_tz<P>
-          - name: y
-            value: interval_year
-        return: precision_timestamp_tz<P>
-      - args:
-          - name: x
-            value: timestamp_tz
-          - name: y
-            value: interval_year
-          - name: timezone
-            description: Timezone string from IANA tzdb.
-            value: string
-        return: timestamp_tz
       - args:
           - name: x
             value: precision_timestamp_tz<P>
@@ -436,22 +323,10 @@ scalar_functions:
         return: date
       - args:
           - name: x
-            value: timestamp
-          - name: y
-            value: interval_day<P>
-        return: timestamp
-      - args:
-          - name: x
             value: precision_timestamp<P>
           - name: y
             value: interval_day<P>
         return: precision_timestamp<P>
-      - args:
-          - name: x
-            value: timestamp_tz
-          - name: y
-            value: interval_day<P>
-        return: timestamp_tz
       - args:
           - name: x
             value: precision_timestamp_tz<P>
@@ -463,28 +338,16 @@ scalar_functions:
             value: date
           - name: y
             value: interval_day<P>
-        return: date
+        return: precision_timestamp<P>
   -
     name: "lte"
     description: less than or equal to
     impls:
       - args:
           - name: x
-            value: timestamp
-          - name: y
-            value: timestamp
-        return: boolean
-      - args:
-          - name: x
             value: precision_timestamp<P>
           - name: y
             value: precision_timestamp<P>
-        return: boolean
-      - args:
-          - name: x
-            value: timestamp_tz
-          - name: y
-            value: timestamp_tz
         return: boolean
       - args:
           - name: x
@@ -516,21 +379,9 @@ scalar_functions:
     impls:
       - args:
           - name: x
-            value: timestamp
-          - name: y
-            value: timestamp
-        return: boolean
-      - args:
-          - name: x
             value: precision_timestamp<P>
           - name: y
             value: precision_timestamp<P>
-        return: boolean
-      - args:
-          - name: x
-            value: timestamp_tz
-          - name: y
-            value: timestamp_tz
         return: boolean
       - args:
           - name: x
@@ -562,21 +413,9 @@ scalar_functions:
     impls:
       - args:
           - name: x
-            value: timestamp
-          - name: y
-            value: timestamp
-        return: boolean
-      - args:
-          - name: x
             value: precision_timestamp<P>
           - name: y
             value: precision_timestamp<P>
-        return: boolean
-      - args:
-          - name: x
-            value: timestamp_tz
-          - name: y
-            value: timestamp_tz
         return: boolean
       - args:
           - name: x
@@ -608,21 +447,9 @@ scalar_functions:
     impls:
       - args:
           - name: x
-            value: timestamp
-          - name: y
-            value: timestamp
-        return: boolean
-      - args:
-          - name: x
             value: precision_timestamp<P>
           - name: y
             value: precision_timestamp<P>
-        return: boolean
-      - args:
-          - name: x
-            value: timestamp_tz
-          - name: y
-            value: timestamp_tz
         return: boolean
       - args:
           - name: x
@@ -653,17 +480,10 @@ scalar_functions:
     description: >-
       Convert local timestamp to UTC-relative timestamp_tz using given local time's timezone.
 
-      Timezone strings must be as defined by IANA timezone database (https://www.iana.org/time-zones).
+      Timezone strings must be specified as defined by IANA timezone database (https://www.iana.org/time-zones).
       Examples: "Pacific/Marquesas", "Etc/GMT+1".
       If timezone is invalid an error is thrown.
     impls:
-      - args:
-          - name: x
-            value: timestamp
-          - name: timezone
-            description: Timezone string from IANA tzdb.
-            value: string
-        return: timestamp_tz
       - args:
           - name: x
             value: precision_timestamp<P>
@@ -675,25 +495,24 @@ scalar_functions:
           - name: x
             value: date
           - name: timezone
-            description: Timezone string from IANA tzdb. Returned timestamp_tz will have time set to 00:00:00.
+            description: >-
+              Timezone string from IANA tzdb. Returned precision_timestamp_tz will have time set to
+              00:00:00 with 0 subseconds in the given precision (0 <= precision <= 12).
             value: string
-        return: timestamp_tz
+          - name: precision
+            value: i8
+        return:  |-
+          precision = integer_parameter(precision)
+          precision_timestamp_tz<precision>
   -
     name: "local_timestamp"
     description: >-
       Convert UTC-relative timestamp_tz to local timestamp using given local time's timezone.
 
-      Timezone strings must be as defined by IANA timezone database (https://www.iana.org/time-zones).
+      Timezone strings must be specified as defined by IANA timezone database (https://www.iana.org/time-zones).
       Examples: "Pacific/Marquesas", "Etc/GMT+1".
       If timezone is invalid an error is thrown.
     impls:
-      - args:
-          - name: x
-            value: timestamp_tz
-          - name: timezone
-            description: Timezone string from IANA tzdb.
-            value: string
-        return: timestamp
       - args:
           - name: x
             value: precision_timestamp_tz<P>
@@ -704,7 +523,7 @@ scalar_functions:
   -
     name: "strptime_time"
     description: >-
-      Parse string into time using provided format,
+      Parse string into precision time using provided format,
       see https://man7.org/linux/man-pages/man3/strptime.3.html for reference.
     impls:
       - args:
@@ -712,7 +531,11 @@ scalar_functions:
             value: string
           - name: format
             value: string
-        return: time
+          - name: precision
+            value: i8
+        return: |-
+          precision = integer_parameter(precision)
+          precision_time<precision>
   -
     name: "strptime_date"
     description: >-
@@ -728,11 +551,11 @@ scalar_functions:
   -
     name: "strptime_timestamp"
     description: >-
-      Parse string into timestamp using provided format,
+      Parse string into precision timestamp using provided format,
       see https://man7.org/linux/man-pages/man3/strptime.3.html for reference.
       If timezone is present in timestamp and provided as parameter an error is thrown.
 
-      Timezone strings must be as defined by IANA timezone database (https://www.iana.org/time-zones).
+      Timezone strings must be specified as defined by IANA timezone database (https://www.iana.org/time-zones).
       Examples: "Pacific/Marquesas", "Etc/GMT+1".
       If timezone is supplied as parameter and present in the parsed string the parsed timezone is used.
       If parameter supplied timezone is invalid an error is thrown.
@@ -745,42 +568,35 @@ scalar_functions:
           - name: timezone
             description: Timezone string from IANA tzdb.
             value: string
-        return: timestamp_tz
+          - name: precision
+            value: i8
+        return: |-
+          precision = integer_parameter(precision)
+          precision_timestamp_tz<precision>
       - args:
           - name: timestamp_string
             value: string
           - name: format
             value: string
-        return: timestamp_tz
+          - name: precision
+            value: i8
+        return: |-
+          precision = integer_parameter(precision)
+          precision_timestamp_tz<precision>
   -
     name: "strftime"
     description: >-
       Convert timestamp/date/time to string using provided format,
       see https://man7.org/linux/man-pages/man3/strftime.3.html for reference.
 
-      Timezone strings must be as defined by IANA timezone database (https://www.iana.org/time-zones).
+      Timezone strings must be specified as defined by IANA timezone database (https://www.iana.org/time-zones).
       Examples: "Pacific/Marquesas", "Etc/GMT+1".
       If timezone is invalid an error is thrown.
     impls:
       - args:
           - name: x
-            value: timestamp
-          - name: format
-            value: string
-        return: string
-      - args:
-          - name: x
             value: precision_timestamp<P>
           - name: format
-            value: string
-        return: string
-      - args:
-          - name: x
-            value: timestamp_tz
-          - name: format
-            value: string
-          - name: timezone
-            description: Timezone string from IANA tzdb.
             value: string
         return: string
       - args:
@@ -800,7 +616,7 @@ scalar_functions:
         return: string
       - args:
           - name: x
-            value: time
+            value: precision_time<P>
           - name: format
             value: string
         return: string
@@ -814,22 +630,10 @@ scalar_functions:
       earlier one if equidistant, ROUND_TIE_UP means to choose the nearest and tie to the later one if
       equidistant.
 
-      Timezone strings must be as defined by IANA timezone database (https://www.iana.org/time-zones).
+      Timezone strings must be specified as defined by IANA timezone database (https://www.iana.org/time-zones).
       Examples: "Pacific/Marquesas", "Etc/GMT+1".
       If timezone is invalid an error is thrown.
     impls:
-      - args:
-          - name: x
-            value: timestamp
-          - name: rounding
-            options: [ FLOOR, CEIL, ROUND_TIE_DOWN, ROUND_TIE_UP ]
-          - name: unit
-            options: [ YEAR, MONTH, WEEK, DAY, HOUR, MINUTE, SECOND, MILLISECOND, MICROSECOND ]
-          - name: multiple
-            value: i64
-          - name: origin
-            value: timestamp
-        return: timestamp
       - args:
           - name: x
             value: precision_timestamp<P>
@@ -842,21 +646,6 @@ scalar_functions:
           - name: origin
             value: precision_timestamp<P>
         return: precision_timestamp<P>
-      - args:
-          - name: x
-            value: timestamp_tz
-          - name: rounding
-            options: [ FLOOR, CEIL, ROUND_TIE_DOWN, ROUND_TIE_UP ]
-          - name: unit
-            options: [ YEAR, MONTH, WEEK, DAY, HOUR, MINUTE, SECOND, MILLISECOND, MICROSECOND ]
-          - name: multiple
-            value: i64
-          - name: timezone
-            description: Timezone string from IANA tzdb.
-            value: string
-          - name: origin
-            value: timestamp_tz
-        return: timestamp_tz
       - args:
           - name: x
             value: precision_timestamp_tz<P>
@@ -886,7 +675,7 @@ scalar_functions:
         return: date
       - args:
           - name: x
-            value: time
+            value: precision_time<P>
           - name: rounding
             options: [ FLOOR, CEIL, ROUND_TIE_DOWN, ROUND_TIE_UP ]
           - name: unit
@@ -894,8 +683,8 @@ scalar_functions:
           - name: multiple
             value: i64
           - name: origin
-            value: time
-        return: time
+            value: precision_time<P>
+        return: precision_time<P>
   -
     name: "round_calendar"
     description: >-
@@ -906,24 +695,11 @@ scalar_functions:
       earlier one if equidistant, ROUND_TIE_UP means to choose the nearest and tie to the later one if
       equidistant.
 
-      Timezone strings must be as defined by IANA timezone database (https://www.iana.org/time-zones).
+      Timezone strings must be specified as defined by IANA timezone database (https://www.iana.org/time-zones).
       Examples: "Pacific/Marquesas", "Etc/GMT+1".
       If timezone is invalid an error is thrown.
 
     impls:
-      - args:
-          - name: x
-            value: timestamp
-          - name: rounding
-            options: [ FLOOR, CEIL, ROUND_TIE_DOWN, ROUND_TIE_UP ]
-          - name: unit
-            options: [ YEAR, MONTH, WEEK, DAY, HOUR, MINUTE, SECOND, MILLISECOND, MICROSECOND ]
-          - name: origin
-            options: [ YEAR, MONTH, MONDAY_WEEK, SUNDAY_WEEK, ISO_WEEK,
-                       US_WEEK, DAY, HOUR, MINUTE, SECOND, MILLISECOND ]
-          - name: multiple
-            value: i64
-        return: timestamp
       - args:
           - name: x
             value: precision_timestamp<P>
@@ -933,26 +709,10 @@ scalar_functions:
             options: [ YEAR, MONTH, WEEK, DAY, HOUR, MINUTE, SECOND, MILLISECOND, MICROSECOND ]
           - name: origin
             options: [ YEAR, MONTH, MONDAY_WEEK, SUNDAY_WEEK, ISO_WEEK,
-                       US_WEEK, DAY, HOUR, MINUTE, SECOND, MILLISECOND ]
+                        US_WEEK, DAY, HOUR, MINUTE, SECOND, MILLISECOND ]
           - name: multiple
             value: i64
         return: precision_timestamp<P>
-      - args:
-          - name: x
-            value: timestamp_tz
-          - name: rounding
-            options: [ FLOOR, CEIL, ROUND_TIE_DOWN, ROUND_TIE_UP ]
-          - name: unit
-            options: [ YEAR, MONTH, WEEK, DAY, HOUR, MINUTE, SECOND, MILLISECOND, MICROSECOND ]
-          - name: origin
-            options: [ YEAR, MONTH, MONDAY_WEEK, SUNDAY_WEEK, ISO_WEEK,
-                       US_WEEK, DAY, HOUR, MINUTE, SECOND, MILLISECOND ]
-          - name: multiple
-            value: i64
-          - name: timezone
-            description: Timezone string from IANA tzdb.
-            value: string
-        return: timestamp_tz
       - args:
           - name: x
             value: precision_timestamp_tz<P>
@@ -962,7 +722,7 @@ scalar_functions:
             options: [ YEAR, MONTH, WEEK, DAY, HOUR, MINUTE, SECOND, MILLISECOND, MICROSECOND ]
           - name: origin
             options: [ YEAR, MONTH, MONDAY_WEEK, SUNDAY_WEEK, ISO_WEEK,
-                       US_WEEK, DAY, HOUR, MINUTE, SECOND, MILLISECOND ]
+                        US_WEEK, DAY, HOUR, MINUTE, SECOND, MILLISECOND ]
           - name: multiple
             value: i64
           - name: timezone
@@ -980,12 +740,10 @@ scalar_functions:
             options: [ YEAR, MONTH, MONDAY_WEEK, SUNDAY_WEEK, ISO_WEEK, US_WEEK, DAY ]
           - name: multiple
             value: i64
-          - name: origin
-            value: date
         return: date
       - args:
           - name: x
-            value: time
+            value: precision_time<P>
           - name: rounding
             options: [ FLOOR, CEIL, ROUND_TIE_DOWN, ROUND_TIE_UP ]
           - name: unit
@@ -994,9 +752,7 @@ scalar_functions:
             options: [ DAY, HOUR, MINUTE, SECOND, MILLISECOND ]
           - name: multiple
             value: i64
-          - name: origin
-            value: time
-        return: time
+        return: precision_time<P>
 
 aggregate_functions:
   - name: "min"
@@ -1011,18 +767,11 @@ aggregate_functions:
         return: date?
       - args:
           - name: x
-            value: time
+            value: precision_time<P>
         nullability: DECLARED_OUTPUT
         decomposable: MANY
-        intermediate: time?
-        return: time?
-      - args:
-          - name: x
-            value: timestamp
-        nullability: DECLARED_OUTPUT
-        decomposable: MANY
-        intermediate: timestamp?
-        return: timestamp?
+        intermediate: precision_time?<P>
+        return: precision_time?<P>
       - args:
           - name: x
             value: precision_timestamp<P>
@@ -1030,13 +779,6 @@ aggregate_functions:
         decomposable: MANY
         intermediate: precision_timestamp?<P>
         return: precision_timestamp?<P>
-      - args:
-          - name: x
-            value: timestamp_tz
-        nullability: DECLARED_OUTPUT
-        decomposable: MANY
-        intermediate: timestamp_tz?
-        return: timestamp_tz?
       - args:
           - name: x
             value: precision_timestamp_tz<P>
@@ -1070,18 +812,11 @@ aggregate_functions:
         return: date?
       - args:
           - name: x
-            value: time
+            value: precision_time<P>
         nullability: DECLARED_OUTPUT
         decomposable: MANY
-        intermediate: time?
-        return: time?
-      - args:
-          - name: x
-            value: timestamp
-        nullability: DECLARED_OUTPUT
-        decomposable: MANY
-        intermediate: timestamp?
-        return: timestamp?
+        intermediate: precision_time?<P>
+        return: precision_time?<P>
       - args:
           - name: x
             value: precision_timestamp<P>
@@ -1089,13 +824,6 @@ aggregate_functions:
         decomposable: MANY
         intermediate: precision_timestamp?<P>
         return: precision_timestamp?<P>
-      - args:
-          - name: x
-            value: timestamp_tz
-        nullability: DECLARED_OUTPUT
-        decomposable: MANY
-        intermediate: timestamp_tz?
-        return: timestamp_tz?
       - args:
           - name: x
             value: precision_timestamp_tz<P>

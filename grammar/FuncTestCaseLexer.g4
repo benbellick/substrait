@@ -11,7 +11,11 @@ Whitespace    : [ \t\n\r]+ -> channel(HIDDEN) ;
 TripleHash: '###';
 SubstraitScalarTest: 'SUBSTRAIT_SCALAR_TEST';
 SubstraitAggregateTest: 'SUBSTRAIT_AGGREGATE_TEST';
+SubstraitWindowTest: 'SUBSTRAIT_WINDOW_TEST';
 SubstraitInclude: 'SUBSTRAIT_INCLUDE';
+SubstraitDependency: 'SUBSTRAIT_DEPENDENCY';
+
+ExtensionUrn: 'extension:' [a-z0-9:._]+;
 
 FormatVersion
     : 'v' DIGIT+ ('.' DIGIT+)?
@@ -36,6 +40,7 @@ IgnoreNulls: 'IGNORE_NULLS';
 NullHandling: 'NULL_HANDLING';
 SpacesOnly: 'SPACES_ONLY';
 Truncate: 'TRUNCATE';
+Over: 'OVER';
 
 IntegerLiteral
     : [+-]? Int
@@ -59,25 +64,25 @@ fragment FourDigits: [0-9][0-9][0-9][0-9];
 fragment TwoDigits: [0-9][0-9];
 
 TimestampTzLiteral
-    : '\'' FourDigits '-' TwoDigits '-' TwoDigits 'T' TwoDigits ':' TwoDigits ':' TwoDigits ( '.' [0-9]+ )?
-        [+-] TwoDigits ':' TwoDigits '\''
+    : FourDigits '-' TwoDigits '-' TwoDigits 'T' TwoDigits ':' TwoDigits ':' TwoDigits ( '.' [0-9]+ )?
+        [+-] TwoDigits ':' TwoDigits
     ;
 
 TimestampLiteral
-    : '\'' FourDigits '-' TwoDigits '-' TwoDigits 'T' TwoDigits ':' TwoDigits ':' TwoDigits ( '.' [0-9]+ )? '\''
+    : FourDigits '-' TwoDigits '-' TwoDigits 'T' TwoDigits ':' TwoDigits ':' TwoDigits ( '.' [0-9]+ )?
     ;
 
 TimeLiteral
-    : '\'' TwoDigits ':' TwoDigits ':' TwoDigits ( '.' [0-9]+ )? '\''
+    : TwoDigits ':' TwoDigits ':' TwoDigits ( '.' [0-9]+ )?
     ;
 
 DateLiteral
-    : '\'' FourDigits '-' TwoDigits '-' TwoDigits '\''
+    : FourDigits '-' TwoDigits '-' TwoDigits
     ;
 
 PeriodPrefix: 'P';
 TimePrefix: 'T';
-YearPrefix: 'Y';
+YearSuffix: 'Y';
 MSuffix: 'M';  // used for both months and minutes
 DaySuffix: 'D';
 HourSuffix: 'H';
@@ -87,13 +92,13 @@ OAngleBracket: Lt;
 CAngleBracket: Gt;
 
 IntervalYearLiteral
-    : '\'' PeriodPrefix IntegerLiteral YearPrefix (IntegerLiteral MSuffix)? '\''
-    | '\'' PeriodPrefix IntegerLiteral MSuffix '\''
+    : PeriodPrefix IntegerLiteral YearSuffix (IntegerLiteral MSuffix)?
+    | PeriodPrefix IntegerLiteral MSuffix
     ;
 
 IntervalDayLiteral
-    : '\'' PeriodPrefix IntegerLiteral DaySuffix (TimePrefix TimeInterval)? '\''
-    | '\'' PeriodPrefix TimePrefix TimeInterval '\''
+    : PeriodPrefix IntegerLiteral DaySuffix (TimePrefix TimeInterval)?
+    | PeriodPrefix TimePrefix TimeInterval
     ;
 
 fragment TimeInterval
@@ -102,11 +107,20 @@ fragment TimeInterval
     | DecimalLiteral SecondSuffix
     ;
 
+IntervalCompoundLiteral
+    : PeriodPrefix (IntegerLiteral YearSuffix)? (IntegerLiteral MSuffix)? (IntegerLiteral DaySuffix)? (TimePrefix TimeInterval)?
+    ;
+
 NullLiteral: 'null';
 
 StringLiteral
     : '\'' ('\\' . | '\'\'' | ~['\\])* '\''
     ;
+
+EnumType: 'enum' ;
+
+OBrace: '{';
+CBrace: '}';
 
 ColumnName
     : 'COL' Int

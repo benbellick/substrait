@@ -20,10 +20,7 @@ scalarType
   | FP64                    #fp64
   | String                  #string
   | Binary                  #binary
-  | Timestamp               #timestamp
-  | Timestamp_TZ            #timestampTz
   | Date                    #date
-  | Time                    #time
   | Interval_Year           #intervalYear
   | UUID                    #uuid
   ;
@@ -34,14 +31,22 @@ parameterizedType
   | FixedBinary isnull=QMark? Lt length=numericParameter Gt                                 #fixedBinary
   | Decimal isnull=QMark? Lt precision=numericParameter Comma scale=numericParameter Gt     #decimal
   | Interval_Day isnull=QMark? Lt precision=numericParameter Gt                             #precisionIntervalDay
+  | Interval_Compound isnull=QMark? Lt precision=numericParameter Gt                        #precisionIntervalCompound
   | Precision_Time isnull=QMark? Lt precision=numericParameter Gt                           #precisionTime
   | Precision_Timestamp isnull=QMark? Lt precision=numericParameter Gt                      #precisionTimestamp
   | Precision_Timestamp_TZ isnull=QMark? Lt precision=numericParameter Gt                   #precisionTimestampTZ
   | Struct isnull=QMark? Lt expr (Comma expr)* Gt                                           #struct
-  | NStruct isnull=QMark? Lt Identifier expr (Comma Identifier expr)* Gt                    #nStruct
+  | NStruct isnull=QMark? Lt Identifier Colon expr (Comma Identifier Colon expr)* Gt        #nStruct
   | List isnull=QMark? Lt expr Gt                                                           #list
   | Map isnull=QMark? Lt key=expr Comma value=expr Gt                                       #map
-  | UserDefined Identifier isnull=QMark? (Lt expr (Comma expr)* Gt)?                        #userDefined
+  | Func isnull=QMark? Lt params=funcParams Arrow returnType=expr Gt                        #func
+  | (dependencyAlias=Identifier Dot)? UserDefined Identifier isnull=QMark?
+      (Lt expr (Comma expr)* Gt)?                                                        #userDefined
+  ;
+
+funcParams
+  : expr                                        #singleFuncParam
+  | OParen expr (Comma expr)* CParen            #funcParamsWithParens
   ;
 
 numericParameter
@@ -68,9 +73,13 @@ expr
   | Number                                                                                  #LiteralNumber
   | Identifier isnull=QMark?                                                                #ParameterName
   | Identifier OParen (expr (Comma expr)*)? CParen                                          #FunctionCall
-  | left=expr op=(And | Or | Plus | Minus | Lt | Gt | Eq | Ne |
-        Lte | Gte | Asterisk | ForwardSlash) right=expr                                     #BinaryExpr
-  | If ifExpr=expr Then thenExpr=expr Else elseExpr=expr                                    #IfExpr
   | (Bang) expr                                                                             #NotExpr
-  | ifExpr=expr QMark thenExpr=expr Colon elseExpr=expr                                     #Ternary
+  | left=expr op=(Asterisk | ForwardSlash) right=expr                                       #MulDiv
+  | left=expr op=(Plus | Minus) right=expr                                                  #AddSub
+  | left=expr op=(Lt | Gt | Lte | Gte) right=expr                                           #Comparison
+  | left=expr op=(Eq | Ne) right=expr                                                       #Equality
+  | left=expr op=And right=expr                                                             #And
+  | left=expr op=Or right=expr                                                              #Or
+  | If ifExpr=expr Then thenExpr=expr Else elseExpr=expr                                    #IfExpr
+  | <assoc=right> ifExpr=expr QMark thenExpr=expr Colon elseExpr=expr                       #Ternary
   ;

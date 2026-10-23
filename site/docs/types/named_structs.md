@@ -4,7 +4,7 @@ A Named Struct is a special type construct that combines:
 * A Struct type
 * A list of names for the fields in the Struct, in depth-first search order
 
-The depth-first search order for names arises from the the ability to nest Structs within other types. All Struct fields must be named, even nested fields.
+The depth-first search order for names arises from the ability to nest Structs within other types. All Struct fields must be named, even nested fields.
 
 Named Structs are most commonly used to model the schema of Read relations.
 
@@ -86,8 +86,8 @@ NamedStruct {
 #### Structs in Structs
 ```
 NamedStruct {
-    names: [a, b, c, d, e, f, g, h, i]
-    struct: struct<i64, struct<i64, struct<i64, i64>, i64, struct<i64, i64>>>>
+    names: [a, b, c, d, e, f, g, h, i, j]
+    struct: struct<i64, struct<i64, struct<i64, i64>, i64, struct<i64, i64>>>
                    ↑    ↑      ↑    ↑      ↑    ↑     ↑    ↑      ↑    ↑
                    a    b      c    d      e    f     g    h      i    j
 }

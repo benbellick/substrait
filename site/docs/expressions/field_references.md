@@ -2,6 +2,13 @@
 
 In Substrait, all fields are dealt with on a positional basis. Field names are only used at the edge of a plan, for the purposes of naming fields for the outside world. Each operation returns a simple or compound data type. Additional operations can refer to data within that initial operation using field references. To reference a field, you use a reference based on the type of field position you want to reference.
 
+Field references can originate from different root types:
+
+- **RootReference**: References the incoming record from the relation
+- **OuterReference**: References outer query records in correlated subqueries, using id-based (`rel_reference`) resolution, or the deprecated offset-based (`steps_out`) resolution (see [Outer References](#outer-references))
+- **Expression**: References the result of evaluating an expression
+- **LambdaParameterReference**: References lambda parameters within lambda body expressions (see [Lambda Expressions](lambda_expressions.md))
+
 | Reference Type            | Properties                                                   | Type Applicability | Type return                |
 | ------------------------- | ------------------------------------------------------------ | ------------------ | -------------------------- |
 | Struct Field              | Ordinal position. Zero-based. Only legal within the range of possible fields within a struct. Selecting an ordinal outside the applicable field range results in an invalid plan. | struct             | Type of field referenced   |
@@ -33,12 +40,12 @@ If we want to represent the SQL expression:
 a.b[2].c['my_map_key'].x
 ```
 
-We will need to declare the nested field such that:
+We will need to declare the nested field such that (SQL array subscripts start at 1, while list offsets start at 0):
 
 ```
 Struct field reference a
 Struct field b
-List offset 2
+List offset 1
 Struct field c
 Map key my_map_key
 Struct field x
@@ -56,7 +63,7 @@ selection {
           field: 0 # .b
           child {
             list_element {
-              offset: 2
+              offset: 1 # [2]
               child {
                 struct_field {
                   field: 0 # .c
@@ -148,3 +155,74 @@ By default, when only a single field is selected from a struct, that struct is r
 
     * Should we support column reordering/positioning using a masked complex expression? (Right now, you can only mask things out.)
 
+### Outer References
+
+Outer references allow expressions inside a subquery to access records from an enclosing relation. The `OuterReference` root type supports two mutually exclusive resolution strategies:
+
+#### `steps_out` (offset-based, deprecated)
+
+!!! warning "Deprecated"
+
+    `steps_out` is deprecated in favor of `rel_reference`. New producers should use `rel_reference`, which resolves unambiguously in all plan shapes. `steps_out` is retained for backward compatibility.
+
+`steps_out` resolves the reference by counting subquery boundaries upward (`steps_out >= 1`). This works correctly whenever the plan is a **tree**, i.e., when each relation has exactly one parent, the path to the binding relation can be uniquely determined via `steps_out`.
+
+#### `rel_reference` (id-based)
+
+`rel_reference` resolves the reference by referring to the binding relation via its plan-wide unique `RelCommon.rel_anchor`. The `rel_anchor` on the referenced relation must be set (>= 1) and unique across all relations in the plan.
+
+#### Coexistence rules
+
+Exactly one of `steps_out` or `rel_reference` must be set on each `OuterReference`. A single plan may contain outer references using different strategies (e.g., some using `steps_out` and others using `rel_reference`), as long as every individual reference is unambiguous. However, if any shared relation (via `ReferenceRel`) contains an unresolved outer reference, that reference **must** use `rel_reference`.
+
+#### When to use `rel_reference`
+
+`rel_reference` must be used instead of `steps_out` when an outer reference appears inside a relation shared via `ReferenceRel` and the shared relation can be reached through multiple paths with different subquery depths, making `steps_out` ambiguous. In this case, the same outer reference could require different `steps_out` values depending on which path is followed.
+
+For example, consider a plan with two nested scalar subqueries that share a common relation `x`. The outer reference to `tableA.a` lives inside `x`, which is reached via paths of different depth:
+
+```
+PlanRel.relations[0].rel:  # let's call it 'x'
+FilterRel(a > outer_ref(steps_out=1, tableA.a)) # steps_out 1 or 2?
+  └── ReadRel(tableB)
+
+PlanRel.relations[1].root:
+ProjectRel # Correct binding for tableA.a for the outer reference tableA.a in x.
+├── ReadRel(tableA)
+└── Subquery.Scalar # Subquery (1)
+    └── SetRel(MINUS_PRIMARY)
+        ├── ProjectRel
+        |   └── Subquery.Scalar # Subquery (2)
+        │       └── ReferenceRel(0) # Here steps_out=1 binds incorrectly, because tableA.a is actually two subquery boundaries out.
+        └── ReferenceRel(0) # Here steps_out=1 binds correctly, because tableA.a is one subquery boundary out.
+```
+
+The same shared relation `x` contains a single stored `steps_out=1` outer reference, but that value is only correct for one of its uses. The other use would need `steps_out=2`, so offset-based resolution is ambiguous.
+
+With `rel_reference`, both reference rels can unambiguously refer to the correct binding.
+
+```
+PlanRel.relations[0].rel:  # let's call it 'x'
+FilterRel(a > outer_ref(rel_reference=7, tableA.a))
+  └── ReadRel(tableB)
+
+PlanRel.relations[1].root:
+ProjectRel [rel_anchor=7] # Correct binding for tableA.a for the outer reference tableA.a in x.
+├── ReadRel(tableA)
+└── Subquery.Scalar # Subquery (1)
+    └── SetRel(MINUS_PRIMARY)
+        ├── ProjectRel
+        |   └── Subquery.Scalar # Subquery (2)
+        │       └── ReferenceRel(0) # Reference 1: rel_reference = 7
+        └── ReferenceRel(0) # Reference 2: rel_reference = 7
+```
+
+#### Lateral Join Example
+
+`rel_reference` is also the mechanism used in lateral joins. In `LateralJoinRel`, the right input is evaluated per left row and can reference the left row's fields via `rel_reference` pointing to the `LateralJoinRel`'s `rel_anchor`:
+
+```
+--8<-- "examples/proto-textformat/field_reference/outer_reference_lateral_join.textproto"
+```
+
+See [Lateral Join Operation](../relations/logical_relations.md#lateral-join-operation) for more details on the relation-level semantics.
