@@ -29,11 +29,17 @@ The specification has passed the initial design phase and is now in the final st
 | [Binary Serialization](../serialization/binary_serialization.md)  | A high performance & compact binary representation of the plan specification. |
 
 
+## Components (Partially Implemented)
+
+| Section                                                      | Description                                                  |
+| ------------------------------------------------------------ | ------------------------------------------------------------ |
+| [Table Functions](../expressions/table_functions.md)              | Functions that produce zero or more rows per invocation. `TableFunctionRel` invokes a `TableFunction` call once in the current evaluation context. For example, `generate_series` generates numeric sequences. |
+
+
 ## Components (Designed but not Implemented)
 
 | Section                                                      | Description                                                  |
 | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| [Table Functions](../expressions/table_functions.md)              | Functions that convert one or more values from an input record into 0..N output records. Example include operations such as explode, pos-explode, etc. |
 | [User Defined Relations](../relations/user_defined_relations.md)  | Installed and reusable relational operations customized to a particular platform. |
 | [Embedded Relations](../relations/embedded_relations.md)          | Relational operations where plans contain the "machine code" to directly execute the necessary operations. |
 | [Physical Relations](../relations/physical_relations.md)          | Specific execution sub-variations of common relational operations that describe have multiple unique physical variants associated with a single logical operation. Examples include hash join, merge join, nested loop join, etc. |

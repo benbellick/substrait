@@ -153,6 +153,33 @@ def test_named_lambda_invocation_round_trip(anchor):
         assert restored.named_lambda.lambda_reference == anchor
 
 
+def test_validate_table_functions():
+    """Calls declare positional output types, including producer-resolved schemas."""
+    examples_dir = Path("site/examples/proto-textformat/table_function")
+    example_files = list(examples_dir.glob("*.textproto"))
+    assert example_files, "No table function examples found"
+    for example in example_files:
+        function = validate_example(example.read_text(), algebra_pb2.TableFunction)
+        assert function.output_type.WhichOneof("kind") == "struct"
+        assert (
+            function.output_type.struct.nullability
+            == function.output_type.NULLABILITY_REQUIRED
+        )
+
+
+def test_validate_table_function_relations():
+    """Standalone relations directly contain the function call."""
+    examples_dir = Path("site/examples/proto-textformat/table_function_rel")
+    example_files = list(examples_dir.glob("*.textproto"))
+    assert example_files, "No table function relation examples found"
+    for example in example_files:
+        relation = validate_example(example.read_text(), algebra_pb2.TableFunctionRel)
+        assert relation.HasField("function")
+        output_type = relation.function.output_type
+        assert output_type.WhichOneof("kind") == "struct"
+        assert output_type.struct.nullability == output_type.NULLABILITY_REQUIRED
+
+
 def test_validate_field_references():
     """Validate field reference examples."""
     examples_dir = Path("site/examples/proto-textformat/field_reference")

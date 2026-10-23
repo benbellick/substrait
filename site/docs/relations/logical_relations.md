@@ -102,7 +102,7 @@ possible approach is that a chunk should only be read if the midpoint of the chu
 
 #### Iceberg Table Type
 
-A Iceberg Table is a table built on [Apache Iceberg](https://iceberg.apache.org/). Iceberg tables can be read by either directly reading a [metadata file](https://iceberg.apache.org/spec/#table-metadata) or by consulting a [catalog](https://iceberg.apache.org/concepts/catalog/). 
+A Iceberg Table is a table built on [Apache Iceberg](https://iceberg.apache.org/). Iceberg tables can be read by either directly reading a [metadata file](https://iceberg.apache.org/spec/#table-metadata) or by consulting a [catalog](https://iceberg.apache.org/concepts/catalog/).
 
 ##### Metadata File Reading
 
@@ -118,6 +118,42 @@ Points to an [Iceberg metadata file](https://iceberg.apache.org/spec/#table-meta
 
     ```proto
 %%% proto.algebra.ReadRel %%%
+    ```
+
+
+## Table Function
+
+`TableFunctionRel` invokes a `TableFunction` once in the current evaluation context and returns its generated rows. It is a leaf operator with no local input row. Arguments may be expressions rather than literals.
+
+The relation contains the `TableFunction` call in its `function` field.
+
+| Signature | Value |
+| --------- | ----- |
+| Inputs | 0 |
+| Outputs | 1 |
+| Property Maintenance | N/A (no inputs) |
+| Direct Output Order | Fields of the function's output struct, in positional order. |
+
+### Table Function Properties
+
+| Property | Description | Required |
+| -------- | ----------- | -------- |
+| Function | The `TableFunction` call to invoke. The call declares a concrete, non-nullable struct `output_type`, even when its YAML implementation omits `return`. | Required |
+
+The output fields may have optional name hints in `RelCommon.hint.output_names`; names are not part of the function's output type. Function arguments, options, and schema determination follow the [Table Functions](../expressions/table_functions.md) contract.
+
+### Example
+
+Generate integers from 1 to 100 using `generate_series:i64_i64_i64`. Function anchor 1 refers to that overload in the `functions_table` extension.
+
+```protobuf
+--8<-- "examples/proto-textformat/table_function_rel/generate_series.textproto"
+```
+
+=== "TableFunctionRel Message"
+
+    ```proto
+%%% proto.algebra.TableFunctionRel %%%
     ```
 
 
