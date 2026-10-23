@@ -2,17 +2,15 @@ common {
   direct {}
   hint { output_names: "value" }
 }
-table_expression {
-  table_function {
-    function_reference: 1
-    arguments { value { literal { i64: 1 } } }
-    arguments { value { literal { i64: 100 } } }
-    arguments { value { literal { i64: 1 } } }
-    output_type {
-      struct {
-        types { i64 { nullability: NULLABILITY_REQUIRED } }
-        nullability: NULLABILITY_REQUIRED
-      }
+function {
+  function_reference: 1
+  arguments { value { literal { i64: 1 } } }
+  arguments { value { literal { i64: 100 } } }
+  arguments { value { literal { i64: 1 } } }
+  output_type {
+    struct {
+      types { i64 { nullability: NULLABILITY_REQUIRED } }
+      nullability: NULLABILITY_REQUIRED
     }
   }
 }

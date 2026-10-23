@@ -639,15 +639,15 @@ enum FetchMode {
   FETCH_MODE_WITH_TIES = 2;
 }
 
-// Evaluates a table expression once in the current evaluation context.
+// Invokes a table function once in the current evaluation context.
 // This leaf relation has no local input row. Function arguments may reference
 // an enclosing scope when evaluated within a correlated subquery.
 message TableFunctionRel {
   RelCommon common = 1;
 
-  // Required table expression. Its output struct fields form the relation's
+  // Required function call. Its output struct fields form the relation's
   // columns in field order.
-  TableExpression table_expression = 2;
+  TableFunction function = 2;
 
   substrait.extensions.AdvancedExtension advanced_extension = 7;
 }
@@ -1840,42 +1840,35 @@ message Expression {
   }
 }
 
-// An expression that produces zero or more rows per evaluation rather than
-// a single value. Relational operators define the evaluation context and how
-// generated rows contribute to their output.
-message TableExpression {
-  oneof table_expr_type {
-    TableFunction table_function = 1;
-  }
+// A table function call that produces zero or more rows per invocation.
+// Shared by standalone and per-input-row relations. The containing operator
+// defines the evaluation context and how generated rows contribute to its output.
+message TableFunction {
+  // Points to a function_anchor in this plan referring to a table function
+  // in an extension YAML file. 0 is a valid anchor/reference, but prefer
+  // non-zero values for ergonomics.
+  uint32 function_reference = 1;
 
-  // A table function call shared by standalone and per-input-row relations.
-  message TableFunction {
-    // Points to a function_anchor in this plan referring to a table function
-    // in an extension YAML file. 0 is a valid anchor/reference, but prefer
-    // non-zero values for ergonomics.
-    uint32 function_reference = 1;
+  // Arguments must match the selected YAML implementation's signature,
+  // including any variadic arguments:
+  //  - Value arguments use FunctionArgument.value.
+  //  - Type arguments use FunctionArgument.type.
+  //  - Enum arguments use FunctionArgument.enum, matching an allowed option
+  //    case-insensitively.
+  // Field references are resolved in the containing operator's context.
+  repeated FunctionArgument arguments = 2;
 
-    // Arguments must match the selected YAML implementation's signature,
-    // including any variadic arguments:
-    //  - Value arguments use FunctionArgument.value.
-    //  - Type arguments use FunctionArgument.type.
-    //  - Enum arguments use FunctionArgument.enum, matching an allowed option
-    //    case-insensitively.
-    // Field references are resolved in the containing operator's context.
-    repeated FunctionArgument arguments = 2;
+  // Behavioral preferences following the options declared by the YAML
+  // implementation, with the same rules as scalar function options.
+  repeated FunctionOption options = 3;
 
-    // Behavioral preferences following the options declared by the YAML
-    // implementation, with the same rules as scalar function options.
-    repeated FunctionOption options = 3;
-
-    // Required concrete output type. Must be a non-nullable Struct whose
-    // fields represent the generated columns. Every output row must conform
-    // to this type. If the YAML implementation declares a return expression,
-    // this must match that expression evaluated with the bound argument types
-    // and nullability rules. Otherwise, the producer determines the type using
-    // argument values, external information, or other function-specific knowledge.
-    Type output_type = 4;
-  }
+  // Required concrete output type. Must be a non-nullable Struct whose
+  // fields represent the generated columns. Every output row must conform
+  // to this type. If the YAML implementation declares a return expression,
+  // this must match that expression evaluated with the bound argument types
+  // and nullability rules. Otherwise, the producer determines the type using
+  // argument values, external information, or other function-specific knowledge.
+  Type output_type = 4;
 }
 
 // Expression that represents a dynamic parameter.

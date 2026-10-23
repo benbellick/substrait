@@ -159,9 +159,7 @@ def test_validate_table_functions():
     example_files = list(examples_dir.glob("*.textproto"))
     assert example_files, "No table function examples found"
     for example in example_files:
-        function = validate_example(
-            example.read_text(), algebra_pb2.TableExpression.TableFunction
-        )
+        function = validate_example(example.read_text(), algebra_pb2.TableFunction)
         assert function.output_type.WhichOneof("kind") == "struct"
         assert (
             function.output_type.struct.nullability
@@ -170,16 +168,14 @@ def test_validate_table_functions():
 
 
 def test_validate_table_function_relations():
-    """Standalone relations invoke the shared table expression."""
+    """Standalone relations directly contain the shared function call."""
     examples_dir = Path("site/examples/proto-textformat/table_function_rel")
     example_files = list(examples_dir.glob("*.textproto"))
     assert example_files, "No table function relation examples found"
     for example in example_files:
         relation = validate_example(example.read_text(), algebra_pb2.TableFunctionRel)
-        assert relation.table_expression.WhichOneof("table_expr_type") == (
-            "table_function"
-        )
-        output_type = relation.table_expression.table_function.output_type
+        assert relation.HasField("function")
+        output_type = relation.function.output_type
         assert output_type.WhichOneof("kind") == "struct"
         assert output_type.struct.nullability == output_type.NULLABILITY_REQUIRED
 

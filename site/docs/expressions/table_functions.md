@@ -2,7 +2,7 @@
 
 Table functions produce zero or more rows per invocation. Unlike scalar functions, which produce a single value, a table function call has a struct output type whose fields represent the generated columns.
 
-The callable representation is `TableExpression.TableFunction`, wrapped by a `TableExpression`. Relational operators determine when the expression is evaluated and how its rows contribute to their output. The standalone [Table Function relation](../relations/logical_relations.md#table-function) evaluates it once in the current evaluation context. A separate per-input-row relation, such as the proposed [GenerateRel](https://github.com/substrait-io/substrait/pull/917), can use the same callable representation without defining another kind of table function.
+The callable representation is the shared `TableFunction` message. Relational operators contain it directly and determine when the function is invoked and how its rows contribute to their output. The standalone [Table Function relation](../relations/logical_relations.md#table-function) evaluates it once in the current evaluation context. A separate per-input-row relation, such as the proposed [GenerateRel](https://github.com/substrait-io/substrait/pull/917), can use the same callable representation without defining another kind of table function.
 
 ## Function Definition Properties
 
@@ -32,7 +32,7 @@ Each implementation may declare an `options` map in YAML. Each named option decl
 
 Value arguments use `FunctionArgument.value`, type arguments use `FunctionArgument.type`, and enumeration arguments use `FunctionArgument.enum`. The containing relational operator determines the scope of field references. Arguments are not restricted to literals unless the function definition requires a constant argument.
 
-A table expression is separate from `Expression` because it produces rows rather than a single value. Its output struct fields become generated columns in positional order; the struct is not emitted as a single column. Individual fields may be nullable, but a nullable outer struct does not represent an empty result. An empty result means zero rows.
+A table function call is separate from `Expression` because it produces rows rather than a single value. Its output struct fields become generated columns in positional order; the struct is not emitted as a single column. Individual fields may be nullable, but a nullable outer struct does not represent an empty result. An empty result means zero rows.
 
 Names are not part of the output type. A relation can supply optional names through `RelCommon.hint.output_names`, or a plan root can supply them through `RelRoot.names`.
 
@@ -81,7 +81,7 @@ These overloads enumerate the currently supported signatures, not a fundamental 
 
 ## Standalone Invocation Examples
 
-These examples are `TableFunctionRel` messages. Each embeds the shared call in `table_expression.table_function`. Function anchor 1 refers to the indicated function in the `functions_table` extension.
+These examples are `TableFunctionRel` messages. Each contains the shared call in its `function` field. Function anchor 1 refers to the indicated function in the `functions_table` extension.
 
 ### Generating a Sequence
 
@@ -128,16 +128,10 @@ The leaf relation can be composed with other relational operators. For example, 
 
 A standalone `TableFunctionRel` has no local input row, but its arguments may reference an enclosing scope when it appears within a correlated subquery. An inner [lateral join](../relations/logical_relations.md#lateral-join-operation) can evaluate the leaf relation once per left row using outer references to that row.
 
-A dedicated per-input-row relation can instead evaluate the same table expression directly against its input row and append the generated fields to the input fields. Such an operator controls row preservation when the function returns no rows; that behavior is separate from the function's own result.
-
-=== "TableExpression Message"
-
-    ```proto
-%%% proto.algebra.TableExpression %%%
-    ```
+A dedicated per-input-row relation can instead invoke the same `TableFunction` directly against its input row and append the generated fields to the input fields. Such an operator controls row preservation when the function returns no rows; that behavior is separate from the function's own result.
 
 === "TableFunction Message"
 
     ```proto
-%%% proto.algebra.TableExpression.TableFunction %%%
+%%% proto.algebra.TableFunction %%%
     ```
