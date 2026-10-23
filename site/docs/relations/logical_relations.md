@@ -125,7 +125,7 @@ Points to an [Iceberg metadata file](https://iceberg.apache.org/spec/#table-meta
 
 `TableFunctionRel` invokes a `TableFunction` once in the current evaluation context and returns its generated rows. It is a leaf operator with no local input row. Arguments may be expressions rather than literals, and may use outer references when the relation appears in a correlated subquery.
 
-The relation directly contains the shared `TableFunction` call in its `function` field rather than defining its own function reference, arguments, options, or output schema. A separate per-input-row operator can use the same callable representation while defining different evaluation and output-combination rules.
+The relation contains the `TableFunction` call in its `function` field.
 
 | Signature | Value |
 | --------- | ----- |
@@ -138,9 +138,9 @@ The relation directly contains the shared `TableFunction` call in its `function`
 
 | Property | Description | Required |
 | -------- | ----------- | -------- |
-| Function | The shared `TableFunction` call to invoke. The call declares a concrete, non-nullable struct `output_type`, even when its YAML implementation omits `return`. | Required |
+| Function | The `TableFunction` call to invoke. The call declares a concrete, non-nullable struct `output_type`, even when its YAML implementation omits `return`. | Required |
 
-The output fields may have optional name hints in `RelCommon.hint.output_names`; names are not part of the function's output type. Function arguments, options, and schema determination follow the shared [Table Functions](../expressions/table_functions.md) contract.
+The output fields may have optional name hints in `RelCommon.hint.output_names`; names are not part of the function's output type. Function arguments, options, and schema determination follow the [Table Functions](../expressions/table_functions.md) contract.
 
 ### Use Cases
 

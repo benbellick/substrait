@@ -154,7 +154,7 @@ def test_named_lambda_invocation_round_trip(anchor):
 
 
 def test_validate_table_functions():
-    """Shared calls declare positional output types, including producer-resolved ones."""
+    """Calls declare positional output types, including producer-resolved schemas."""
     examples_dir = Path("site/examples/proto-textformat/table_function")
     example_files = list(examples_dir.glob("*.textproto"))
     assert example_files, "No table function examples found"
@@ -168,7 +168,7 @@ def test_validate_table_functions():
 
 
 def test_validate_table_function_relations():
-    """Standalone relations directly contain the shared function call."""
+    """Standalone relations directly contain the function call."""
     examples_dir = Path("site/examples/proto-textformat/table_function_rel")
     example_files = list(examples_dir.glob("*.textproto"))
     assert example_files, "No table function relation examples found"

@@ -2,7 +2,7 @@
 
 Table functions produce zero or more rows per invocation. Unlike scalar functions, which produce a single value, a table function call has a struct output type whose fields represent the generated columns.
 
-The callable representation is the shared `TableFunction` message. Relational operators contain it directly and determine when the function is invoked and how its rows contribute to their output. The standalone [Table Function relation](../relations/logical_relations.md#table-function) evaluates it once in the current evaluation context. A separate per-input-row relation, such as the proposed [GenerateRel](https://github.com/substrait-io/substrait/pull/917), can use the same callable representation without defining another kind of table function.
+A table function call is represented by the `TableFunction` message. The [Table Function relation](../relations/logical_relations.md#table-function) contains the call in its `function` field and evaluates it once in the current evaluation context.
 
 ## Function Definition Properties
 
@@ -56,17 +56,17 @@ For example, this parsing function uses a schema-defining string argument to det
 --8<-- "examples/extensions/producer_resolved_table_function.yaml"
 ```
 
-The producer resolves the schema argument's value and declares the resulting struct in the shared function call. Function anchor 1 refers to `parse_records:str_str` from the example extension.
+The producer resolves the schema argument's value and declares the resulting struct in the function call. Function anchor 1 refers to `parse_records:str_str` from the example extension.
 
 ```protobuf
 --8<-- "examples/proto-textformat/table_function/producer_resolved_schema.textproto"
 ```
 
-A function like `read_parquet(path)` may instead require inspecting a file's structure. The same contract applies. The columns cannot change between generated rows, including when a relational operator evaluates the call for successive input rows.
+A function like `read_parquet(path)` may instead require inspecting a file's structure. The same contract applies. The columns cannot change between generated rows.
 
 ## Standalone Invocation Examples
 
-These examples are `TableFunctionRel` messages. Each contains the shared call in its `function` field. Function anchor 1 refers to the indicated function in the `functions_table` extension.
+These examples are `TableFunctionRel` messages. Each contains the function call in its `function` field. Function anchor 1 refers to the indicated function in the `functions_table` extension.
 
 ### Generating a Sequence
 
@@ -87,8 +87,6 @@ The leaf relation can be composed with other relational operators. For example, 
 ## Correlated Invocation
 
 A standalone `TableFunctionRel` has no local input row, but its arguments may reference an enclosing scope when it appears within a correlated subquery. An inner [lateral join](../relations/logical_relations.md#lateral-join-operation) can evaluate the leaf relation once per left row using outer references to that row.
-
-A dedicated per-input-row relation can instead invoke the same `TableFunction` directly against its input row and append the generated fields to the input fields. Such an operator controls row preservation when the function returns no rows; that behavior is separate from the function's own result.
 
 === "TableFunction Message"
 

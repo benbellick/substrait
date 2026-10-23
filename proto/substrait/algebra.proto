@@ -1841,8 +1841,6 @@ message Expression {
 }
 
 // A table function call that produces zero or more rows per invocation.
-// Shared by standalone and per-input-row relations. The containing operator
-// defines the evaluation context and how generated rows contribute to its output.
 message TableFunction {
   // Points to a function_anchor in this plan referring to a table function
   // in an extension YAML file. 0 is a valid anchor/reference, but prefer
