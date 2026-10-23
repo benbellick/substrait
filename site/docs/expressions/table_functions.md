@@ -13,7 +13,6 @@ Table functions are declared under `table_functions` in extension YAML files.
 | Name | A case-sensitive UTF-8 name used to reference the function. | Required |
 | List of arguments | Value, type, or enumeration arguments, following [scalar function argument types](scalar_functions.md#argument-types). | Optional, defaults to niladic. |
 | Variadic Behavior | Whether the last argument can be repeated, with optional minimum and maximum counts. | Optional, defaults to a single argument. |
-| Nullability Handling | Follows the [scalar function nullability modes](scalar_functions.md#nullability-handling). The return type must resolve to a non-nullable struct. | Optional, defaults to `MIRROR`. |
 | Options | Named behavioral options declared per implementation, following the [scalar function option mechanism](scalar_functions.md#options). | Optional |
 | Description | Human-readable description of the function. | Optional |
 | Return Type | A type expression that resolves to a non-nullable struct. May be omitted when the producer determines the schema from argument values or external information. | Optional, see [Schema Determination](#schema-determination). |
@@ -32,6 +31,8 @@ Options follow the [scalar function option rules](scalar_functions.md#options).
 
 Value arguments use `FunctionArgument.value`, type arguments use `FunctionArgument.type`, and enumeration arguments use `FunctionArgument.enum`. Arguments are not restricted to literals unless the function definition requires a constant argument.
 
+Value arguments accept nullable and non-nullable input types. Their outermost nullability is ignored for type matching and type-parameter binding; nested nullability is preserved. Argument type declarations must not mark the outermost type nullable. Output field nullability comes from the output type, not automatically from argument nullability. Each function defines its behavior for NULL argument values.
+
 A table function call is separate from `Expression` because it produces rows rather than a single value. Its output struct fields become generated columns in positional order; the struct is not emitted as a single column. Individual fields may be nullable, but a nullable outer struct does not represent an empty result. An empty result means zero rows.
 
 Names are not part of the output type. A relation can supply optional names through `RelCommon.hint.output_names`, or a plan root can supply them through `RelRoot.names`.
@@ -42,7 +43,7 @@ Every call must declare a concrete `output_type`, regardless of whether its YAML
 
 ### Schemas Derivable from YAML
 
-When an implementation declares `return`, the call's `output_type` must match that expression evaluated with the bound argument types and nullability rules.
+When an implementation declares `return`, the call's `output_type` must match that expression evaluated with the bound argument types.
 
 ### Schemas Determined by Plan Producer
 
@@ -68,7 +69,7 @@ These examples are `TableFunctionRel` messages. Each contains the function call 
 
 All `generate_series` overloads require an explicit `step` argument. Producers must supply any default chosen by the source query language.
 
-A zero `step` raises an error.
+If any argument is NULL, the result is empty. Otherwise, a zero `step` raises an error.
 
 Generate integers from 1 to 100 using `generate_series:i64_i64_i64` with an explicit step of 1.
 

@@ -21,6 +21,15 @@ def test_table_function_definitions_match_schema(
     Draft202012Validator(simple_extensions_schema).validate(table_functions)
 
 
+@pytest.mark.parametrize("nullability", ["MIRROR", "DECLARED_OUTPUT", "DISCRETE"])
+def test_table_function_rejects_nullability_setting(
+    table_functions, simple_extensions_schema, nullability
+):
+    table_functions["table_functions"][0]["impls"][0]["nullability"] = nullability
+    with pytest.raises(ValidationError):
+        Draft202012Validator(simple_extensions_schema).validate(table_functions)
+
+
 def test_table_function_return_schema_may_be_omitted(
     table_functions, simple_extensions_schema
 ):

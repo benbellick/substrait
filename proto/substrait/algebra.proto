@@ -1861,9 +1861,9 @@ message TableFunction {
   // Required concrete output type. Must be a non-nullable Struct whose
   // fields represent the generated columns. Every output row must conform
   // to this type. If the YAML implementation declares a return expression,
-  // this must match that expression evaluated with the bound argument types
-  // and nullability rules. Otherwise, the producer determines the type using
-  // argument values, external information, or other function-specific knowledge.
+  // this must match that expression evaluated with the bound argument types.
+  // Otherwise, the producer determines the type using argument values, external
+  // information, or other function-specific knowledge.
   Type output_type = 4;
 }
 

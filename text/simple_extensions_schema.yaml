@@ -402,8 +402,6 @@ $defs:
               $ref: "#/$defs/arguments"
             variadic:
               $ref: "#/$defs/variadicBehavior"
-            nullability:
-              $ref: "#/$defs/nullabilityHandling"
             options:
               $ref: "#/$defs/options"
             return:
