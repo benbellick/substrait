@@ -82,10 +82,6 @@ The SQL equivalent is `SELECT * FROM generate_series(1, 100, 1)`.
 
 The leaf relation can be composed with other relational operators. For example, placing a `FilterRel` above a `TableFunctionRel` filters the generated rows without changing the function call.
 
-## Correlated Invocation
-
-A standalone `TableFunctionRel` has no local input row, but its arguments may reference an enclosing scope when it appears within a correlated subquery. An inner [lateral join](../relations/logical_relations.md#lateral-join-operation) can evaluate the leaf relation once per left row using outer references to that row.
-
 === "TableFunction Message"
 
     ```proto
