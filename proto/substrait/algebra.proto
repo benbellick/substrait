@@ -1855,7 +1855,6 @@ message TableFunction {
   //  - Type arguments use FunctionArgument.type.
   //  - Enum arguments use FunctionArgument.enum, matching an allowed option
   //    case-insensitively.
-  // Field references are resolved in the containing operator's context.
   repeated FunctionArgument arguments = 2;
 
   // Behavioral preferences following the options declared by the YAML
