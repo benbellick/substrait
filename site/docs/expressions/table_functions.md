@@ -85,6 +85,8 @@ These examples are `TableFunctionRel` messages. Each embeds the shared call in `
 
 ### Generating a Sequence
 
+All `generate_series` overloads require an explicit `step` argument. Producers must supply any default chosen by the source query language.
+
 Generate integers from 1 to 100 using `generate_series:i64_i64_i64` with an explicit step of 1.
 
 ```protobuf

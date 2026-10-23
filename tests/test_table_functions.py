@@ -67,6 +67,21 @@ def test_table_function_options_reject_invalid_definitions(
         Draft202012Validator(simple_extensions_schema).validate(table_functions)
 
 
+def test_generate_series_requires_explicit_step(table_functions):
+    generate_series = next(
+        function
+        for function in table_functions["table_functions"]
+        if function["name"] == "generate_series"
+    )
+    assert [
+        [(arg["name"], arg["value"]) for arg in impl["args"]]
+        for impl in generate_series["impls"]
+    ] == [
+        [("start", "i64"), ("stop", "i64"), ("step", "i64")],
+        [("start", "i32"), ("stop", "i32"), ("step", "i32")],
+    ]
+
+
 def test_unnest_supports_one_through_four_lists(table_functions):
     unnest = next(
         function

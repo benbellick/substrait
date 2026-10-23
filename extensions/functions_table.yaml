@@ -6,6 +6,7 @@ table_functions:
   - name: "generate_series"
     description: >-
       Generates a series of integer values from start to stop, incrementing by step.
+      An explicit step argument is required.
 
       Produces zero or more records containing a single integer value. The series
       includes both the start and stop values if they fall on a step boundary.
@@ -35,24 +36,6 @@ table_functions:
           - name: step
             value: i32
             description: The increment between values
-        nullability: DECLARED_OUTPUT
-        return: struct<i32>
-      - args:
-          - name: start
-            value: i64
-            description: The starting value of the series
-          - name: stop
-            value: i64
-            description: The ending value of the series (inclusive)
-        nullability: DECLARED_OUTPUT
-        return: struct<i64>
-      - args:
-          - name: start
-            value: i32
-            description: The starting value of the series
-          - name: stop
-            value: i32
-            description: The ending value of the series (inclusive)
         nullability: DECLARED_OUTPUT
         return: struct<i32>
   - name: "unnest"
