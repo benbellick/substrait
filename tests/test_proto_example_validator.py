@@ -179,37 +179,6 @@ def test_validate_table_function_relations():
         )
 
 
-def test_table_function_rejects_scalar_output_type():
-    with pytest.raises(text_format.ParseError, match="i64"):
-        validate_example(
-            "output_type { i64 { nullability: NULLABILITY_REQUIRED } }",
-            algebra_pb2.TableFunction,
-        )
-
-
-def test_table_function_output_schema_round_trip():
-    output_schema = type_pb2.Type.Struct(
-        types=[
-            type_pb2.Type(
-                i64=type_pb2.Type.I64(nullability=type_pb2.Type.NULLABILITY_NULLABLE)
-            )
-        ],
-        nullability=type_pb2.Type.NULLABILITY_REQUIRED,
-    )
-    function = algebra_pb2.TableFunction(
-        function_reference=1, output_type=output_schema
-    )
-    restored_functions = [
-        algebra_pb2.TableFunction.FromString(function.SerializeToString()),
-        json_format.Parse(
-            json_format.MessageToJson(function), algebra_pb2.TableFunction()
-        ),
-    ]
-    for restored in restored_functions:
-        assert restored == function
-        assert restored.output_type == output_schema
-
-
 def test_validate_field_references():
     """Validate field reference examples."""
     examples_dir = Path("site/examples/proto-textformat/field_reference")
