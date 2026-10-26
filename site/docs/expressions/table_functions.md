@@ -2,7 +2,7 @@
 
 Table functions produce zero or more rows per invocation. Unlike scalar functions, which produce a single value, a table function call has a struct output type whose fields represent the generated columns.
 
-A table function call is represented by the `TableFunction` message. The [Table Function relation](../relations/logical_relations.md#table-function) contains the call in its `function` field and evaluates it once in the current evaluation context.
+A table function call is represented by the `TableFunction` message. The [Table Function relation](../relations/logical_relations.md#table-function) contains the call in its `function` field and returns its generated rows.
 
 ## Function Definition Properties
 

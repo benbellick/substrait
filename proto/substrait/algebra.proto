@@ -639,7 +639,7 @@ enum FetchMode {
   FETCH_MODE_WITH_TIES = 2;
 }
 
-// Invokes a table function once in the current evaluation context.
+// Invokes a table function and returns its generated rows.
 // This leaf relation has no local input row.
 message TableFunctionRel {
   RelCommon common = 1;
