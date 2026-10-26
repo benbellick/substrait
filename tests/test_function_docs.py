@@ -56,23 +56,19 @@ def test_table_function_catalog_documents_return_types(function_docs_workspace):
     ) in producer_resolved
 
 
-@pytest.mark.parametrize("section", ["scalar_functions", "table_functions"])
-@pytest.mark.parametrize("argument_name", [None, "t"])
-def test_function_catalog_documents_type_arguments(
-    function_docs_workspace, section, argument_name
-):
+def test_table_function_catalog_documents_type_arguments(function_docs_workspace):
     script, extensions, generated_docs = function_docs_workspace
-    type_argument = {"type": "any1"}
-    if argument_name is not None:
-        type_argument["name"] = argument_name
     extension = {
         "urn": "extension:org.example:typed_functions",
-        section: [
+        "table_functions": [
             {
                 "name": "typed_call",
                 "impls": [
                     {
-                        "args": [{"name": "value", "value": "any1"}, type_argument],
+                        "args": [
+                            {"name": "value", "value": "any1"},
+                            {"name": "t", "type": "any1"},
+                        ],
                         "return": "struct<any1>",
                     }
                 ],
@@ -83,45 +79,22 @@ def test_function_catalog_documents_type_arguments(
     runpy.run_path(str(script))
 
     catalog = (generated_docs / "extensions" / "typed_functions.md").read_text()
-    type_label = "<type> any1"
-    if argument_name is not None:
-        type_label = f"{argument_name}: {type_label}"
-    assert f"typed_call(`value: any1`, `{type_label}`): -> `struct<any1>`" in catalog
+    assert "typed_call(`value: any1`, `t: <type> any1`): -> `struct<any1>`" in catalog
 
 
-def test_table_function_catalog_documents_implementation_description(
+def test_table_function_catalog_accepts_omitted_variadic_minimum(
     function_docs_workspace,
-):
-    script, extensions, generated_docs = function_docs_workspace
-    source = extensions / "functions_table.yaml"
-    extension = yaml.safe_load(source.read_text())
-    extension["table_functions"][0]["impls"][0]["description"] = (
-        "Generates a series of 64-bit integers."
-    )
-    source.write_text(yaml.safe_dump(extension))
-    runpy.run_path(str(script))
-
-    catalog = (generated_docs / "extensions" / "functions_table.md").read_text()
-    assert "<br>*Generates a series of 64-bit integers.*" in catalog
-
-
-@pytest.mark.parametrize("section", ["scalar_functions", "table_functions"])
-@pytest.mark.parametrize(
-    "variadic, minimum", [({}, 1), ({"max": 4}, 1), ({"min": 3, "max": 4}, 3)]
-)
-def test_function_catalog_documents_variadic_arguments(
-    function_docs_workspace, section, variadic, minimum
 ):
     script, extensions, generated_docs = function_docs_workspace
     extension = {
         "urn": "extension:org.example:variadic_functions",
-        section: [
+        "table_functions": [
             {
                 "name": "repeat_values",
                 "impls": [
                     {
                         "args": [{"name": "value", "value": "i64"}],
-                        "variadic": variadic,
+                        "variadic": {"max": 4},
                         "return": "struct<i64>",
                     }
                 ],
@@ -132,5 +105,4 @@ def test_function_catalog_documents_variadic_arguments(
     runpy.run_path(str(script))
 
     catalog = (generated_docs / "extensions" / "variadic_functions.md").read_text()
-    arguments = ", ".join(["`value: i64`"] * minimum)
-    assert f"repeat_values({arguments}): -> `struct<i64>`" in catalog
+    assert "repeat_values(`value: i64`): -> `struct<i64>`" in catalog

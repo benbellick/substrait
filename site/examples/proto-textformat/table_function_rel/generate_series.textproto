@@ -1,3 +1,5 @@
+# Generates integers from 1 through 100 with a step of 1.
+# Function anchor 1 refers to generate_series:i64_i64_i64 in functions_table.
 common {
   direct {}
   hint { output_names: "value" }

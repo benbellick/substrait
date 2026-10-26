@@ -393,7 +393,8 @@ $defs:
         $ref: "#/$defs/deprecationStatus"
       description:
         type: string
-      metadata: # arbitrary data created by extension author
+      metadata:
+        description: Arbitrary data created by the extension author.
         type: object
       impls:
         type: array
