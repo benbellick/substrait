@@ -11,8 +11,9 @@ table_functions:
       Produces zero or more records containing a single integer value. The series
       includes both the start and stop values if they fall on a step boundary.
       If step is positive, stops when the value exceeds stop. If step is negative,
-      stops when the value is less than stop. Returns empty if step is zero or if
-      the step direction doesn't allow reaching stop from start.
+      stops when the value is less than stop. Returns empty if any argument is
+      NULL. Otherwise, raises an error if step is zero, and returns empty if the
+      step direction doesn't allow reaching stop from start.
     impls:
       - args:
           - name: start
@@ -24,7 +25,6 @@ table_functions:
           - name: step
             value: i64
             description: The increment between values
-        nullability: DECLARED_OUTPUT
         return: struct<i64>
       - args:
           - name: start
@@ -36,7 +36,6 @@ table_functions:
           - name: step
             value: i32
             description: The increment between values
-        nullability: DECLARED_OUTPUT
         return: struct<i32>
   - name: "unnest"
     description: >-
@@ -55,7 +54,6 @@ table_functions:
           - name: input
             value: list<any1>
             description: The list to unnest
-        nullability: DECLARED_OUTPUT
         return: struct<any1>
       - args:
           - name: input1
@@ -64,7 +62,6 @@ table_functions:
           - name: input2
             value: list<any2>
             description: The second list to unnest
-        nullability: DECLARED_OUTPUT
         return: struct<any1?, any2?>
       - args:
           - name: input1
@@ -76,7 +73,6 @@ table_functions:
           - name: input3
             value: list<any3>
             description: The third list to unnest
-        nullability: DECLARED_OUTPUT
         return: struct<any1?, any2?, any3?>
       - args:
           - name: input1
@@ -91,5 +87,4 @@ table_functions:
           - name: input4
             value: list<any4>
             description: The fourth list to unnest
-        nullability: DECLARED_OUTPUT
         return: struct<any1?, any2?, any3?, any4?>

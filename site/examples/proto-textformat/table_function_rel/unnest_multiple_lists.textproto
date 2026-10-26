@@ -24,10 +24,8 @@ function {
     }
   }
   output_type {
-    struct {
-      types { i32 { nullability: NULLABILITY_NULLABLE } }
-      types { string { nullability: NULLABILITY_NULLABLE } }
-      nullability: NULLABILITY_REQUIRED
-    }
+    types { i32 { nullability: NULLABILITY_NULLABLE } }
+    types { string { nullability: NULLABILITY_NULLABLE } }
+    nullability: NULLABILITY_REQUIRED
   }
 }

@@ -389,8 +389,12 @@ $defs:
     properties:
       name:
         type: string
+      deprecated:
+        $ref: "#/$defs/deprecationStatus"
       description:
         type: string
+      metadata: # arbitrary data created by extension author
+        type: object
       impls:
         type: array
         minItems: 1
@@ -398,18 +402,21 @@ $defs:
           type: object
           additionalProperties: false
           properties:
+            deprecated:
+              $ref: "#/$defs/deprecationStatus"
+            description:
+              type: string
             args:
               $ref: "#/$defs/arguments"
             variadic:
               $ref: "#/$defs/variadicBehavior"
-            nullability:
-              $ref: "#/$defs/nullabilityHandling"
             options:
               $ref: "#/$defs/options"
             return:
-              # The output row type must resolve to a non-nullable struct.
-              # Omit when the producer determines the schema from argument values
-              # or external information instead of a YAML type expression.
+              description: >-
+                The output row type must resolve to a non-nullable struct.
+                Omit when the producer determines the schema from argument values
+                or external information instead of a YAML type expression.
               $ref: "#/$defs/returnValue"
             implementation:
               $ref: "#/$defs/implementation"

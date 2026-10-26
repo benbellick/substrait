@@ -125,6 +125,29 @@ def test_iter_structure_type_expressions():
         assert list(iter_structure_type_expressions(structure)) == expected
 
 
+def test_iter_type_expressions_includes_table_functions():
+    extension = {
+        "table_functions": [
+            {
+                "name": "generate",
+                "impls": [
+                    {
+                        "args": [{"value": "list<any1>"}, {"type": "any2"}],
+                        "return": "struct<any1, any2>",
+                    },
+                    {"args": [{"value": "string"}]},
+                ],
+            }
+        ]
+    }
+    assert list(iter_type_expressions(extension)) == [
+        "list<any1>",
+        "any2",
+        "struct<any1, any2>",
+        "string",
+    ]
+
+
 def test_parse_valid_type_expressions():
     """Type grammar accepts representative valid type expressions."""
     valid_cases = [

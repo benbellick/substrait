@@ -52,12 +52,15 @@ def write_markdown(file_obj: dict, file_name: str) -> None:
                 arg_string = []
 
                 for arg in args_list:
-                    if "value" in arg:
+                    if "value" in arg or "type" in arg:
+                        argument_type = (
+                            arg["value"] if "value" in arg else f"<type> {arg['type']}"
+                        )
                         name = arg.get("name")
                         if name:
-                            arg_string.append(f"{name}: {arg['value']}")
+                            arg_string.append(f"{name}: {argument_type}")
                         else:
-                            arg_string.append(arg["value"])
+                            arg_string.append(argument_type)
                     elif "options" in arg:
                         choices = str(arg["options"])
                         option_name = str(arg["name"]) if "name" in arg else choices
@@ -78,7 +81,7 @@ def write_markdown(file_obj: dict, file_name: str) -> None:
                     option_names_list.append(f"option:{opt_name}")
 
                 if "variadic" in impl:
-                    min_args = impl["variadic"]["min"]
+                    min_args = impl["variadic"].get("min", 1)
                     for _ in range(min_args - 1):
                         arg_string.append(arg_string[-1])
 

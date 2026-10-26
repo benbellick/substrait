@@ -206,6 +206,12 @@ properties:
     items:
       $ref: "#/definitions/dialect_function"
 
+  supported_table_functions:
+    type: array
+    description: Functions that produce zero or more rows per invocation.
+    items:
+      $ref: "#/definitions/dialect_function"
+
   supported_execution_behavior:
     type: object
     additionalProperties: false

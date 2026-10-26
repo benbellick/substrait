@@ -639,9 +639,8 @@ enum FetchMode {
   FETCH_MODE_WITH_TIES = 2;
 }
 
-// Invokes a table function once in the current evaluation context.
-// This leaf relation has no local input row. Function arguments may reference
-// an enclosing scope when evaluated within a correlated subquery.
+// Invokes a table function and returns its generated rows.
+// This leaf relation has no local input row.
 message TableFunctionRel {
   RelCommon common = 1;
 
@@ -1841,8 +1840,6 @@ message Expression {
 }
 
 // A table function call that produces zero or more rows per invocation.
-// Shared by standalone and per-input-row relations. The containing operator
-// defines the evaluation context and how generated rows contribute to its output.
 message TableFunction {
   // Points to a function_anchor in this plan referring to a table function
   // in an extension YAML file. 0 is a valid anchor/reference, but prefer
@@ -1855,20 +1852,19 @@ message TableFunction {
   //  - Type arguments use FunctionArgument.type.
   //  - Enum arguments use FunctionArgument.enum, matching an allowed option
   //    case-insensitively.
-  // Field references are resolved in the containing operator's context.
   repeated FunctionArgument arguments = 2;
 
   // Behavioral preferences following the options declared by the YAML
   // implementation, with the same rules as scalar function options.
   repeated FunctionOption options = 3;
 
-  // Required concrete output type. Must be a non-nullable Struct whose
-  // fields represent the generated columns. Every output row must conform
-  // to this type. If the YAML implementation declares a return expression,
-  // this must match that expression evaluated with the bound argument types
-  // and nullability rules. Otherwise, the producer determines the type using
-  // argument values, external information, or other function-specific knowledge.
-  Type output_type = 4;
+  // Required concrete output schema. Nullability must be NULLABILITY_REQUIRED.
+  // Its fields represent the generated columns, and every output row must
+  // conform to this type. If the YAML implementation declares a return expression,
+  // this must match that expression evaluated with the bound argument types.
+  // Otherwise, the producer determines the type using argument values, external
+  // information, or other function-specific knowledge.
+  Type.Struct output_type = 4;
 }
 
 // Expression that represents a dynamic parameter.

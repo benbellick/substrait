@@ -16,9 +16,7 @@ function {
     }
   }
   output_type {
-    struct {
-      types { string { nullability: NULLABILITY_REQUIRED } }
-      nullability: NULLABILITY_REQUIRED
-    }
+    types { string { nullability: NULLABILITY_REQUIRED } }
+    nullability: NULLABILITY_REQUIRED
   }
 }
