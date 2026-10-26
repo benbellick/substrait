@@ -10,7 +10,7 @@ from google.protobuf.message import Message
 import pytest
 
 try:
-    from substrait import algebra_pb2, extended_expression_pb2, plan_pb2
+    from substrait import algebra_pb2, extended_expression_pb2, plan_pb2, type_pb2
 except ImportError as err:
     raise ImportError(
         "Protobuf bindings not found. Run 'buf generate' to generate them."
@@ -160,11 +160,8 @@ def test_validate_table_functions():
     assert example_files, "No table function examples found"
     for example in example_files:
         function = validate_example(example.read_text(), algebra_pb2.TableFunction)
-        assert function.output_type.WhichOneof("kind") == "struct"
-        assert (
-            function.output_type.struct.nullability
-            == function.output_type.NULLABILITY_REQUIRED
-        )
+        assert function.HasField("output_type")
+        assert function.output_type.nullability == type_pb2.Type.NULLABILITY_REQUIRED
 
 
 def test_validate_table_function_relations():
@@ -175,9 +172,42 @@ def test_validate_table_function_relations():
     for example in example_files:
         relation = validate_example(example.read_text(), algebra_pb2.TableFunctionRel)
         assert relation.HasField("function")
-        output_type = relation.function.output_type
-        assert output_type.WhichOneof("kind") == "struct"
-        assert output_type.struct.nullability == output_type.NULLABILITY_REQUIRED
+        assert relation.function.HasField("output_type")
+        assert (
+            relation.function.output_type.nullability
+            == type_pb2.Type.NULLABILITY_REQUIRED
+        )
+
+
+def test_table_function_rejects_scalar_output_type():
+    with pytest.raises(text_format.ParseError, match="i64"):
+        validate_example(
+            "output_type { i64 { nullability: NULLABILITY_REQUIRED } }",
+            algebra_pb2.TableFunction,
+        )
+
+
+def test_table_function_output_schema_round_trip():
+    output_schema = type_pb2.Type.Struct(
+        types=[
+            type_pb2.Type(
+                i64=type_pb2.Type.I64(nullability=type_pb2.Type.NULLABILITY_NULLABLE)
+            )
+        ],
+        nullability=type_pb2.Type.NULLABILITY_REQUIRED,
+    )
+    function = algebra_pb2.TableFunction(
+        function_reference=1, output_type=output_schema
+    )
+    restored_functions = [
+        algebra_pb2.TableFunction.FromString(function.SerializeToString()),
+        json_format.Parse(
+            json_format.MessageToJson(function), algebra_pb2.TableFunction()
+        ),
+    ]
+    for restored in restored_functions:
+        assert restored == function
+        assert restored.output_type == output_schema
 
 
 def test_validate_field_references():

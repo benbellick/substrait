@@ -27,7 +27,7 @@ Options follow the [scalar function option rules](scalar_functions.md#options).
 | `function_reference` | A function anchor in the plan referring to a table function in an extension YAML file. Zero is valid, though non-zero anchors are preferred for ergonomics. | Required |
 | `arguments` | Arguments matching the selected implementation's signature, including any variadic arguments. | Optional for niladic functions. |
 | `options` | Named behavioral preferences using the implementation's declared options. | Optional |
-| `output_type` | The concrete, non-nullable struct type of every generated row. | Required |
+| `output_type` | The concrete `Type.Struct` schema of every generated row, with `nullability` set to `NULLABILITY_REQUIRED`. | Required |
 
 Value arguments use `FunctionArgument.value`, type arguments use `FunctionArgument.type`, and enumeration arguments use `FunctionArgument.enum`. Arguments are not restricted to literals unless the function definition requires a constant argument.
 
