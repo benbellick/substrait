@@ -39,7 +39,7 @@ Every call must declare a concrete `output_type`, regardless of whether its YAML
 
 ### Schemas Derivable from YAML
 
-When an implementation declares `return`, the call's `output_type` must match that expression evaluated with the bound argument types.
+If an implementation declares `return`, the call's `output_type` must match that expression evaluated with the bound argument types.
 
 ### Schemas Determined by Plan Producer
 
