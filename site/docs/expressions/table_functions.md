@@ -14,7 +14,7 @@ Table functions are declared under `table_functions` in extension YAML files.
 | List of arguments | Value, type, or enumeration arguments, following [scalar function argument types](scalar_functions.md#argument-types). | Optional, defaults to niladic. |
 | Variadic Behavior | Whether the last argument can be repeated, with optional minimum and maximum counts. | Optional, defaults to a single argument. |
 | Options | Named behavioral options declared per implementation, following the [scalar function option mechanism](scalar_functions.md#options). | Optional |
-| Description | Human-readable description of the function. | Optional |
+| Description | Human-readable description of the function or an individual implementation. | Optional |
 | Return Type | A type expression that resolves to a non-nullable struct. May be omitted when the producer determines the schema from argument values or external information. | Optional, see [Schema Determination](#schema-determination). |
 | Implementation Map | Locations of function implementations. | Optional |
 

@@ -23,6 +23,15 @@ def test_table_function_definitions_match_schema(
     Draft202012Validator(simple_extensions_schema).validate(table_functions)
 
 
+def test_table_function_implementation_description_matches_schema(
+    table_functions, simple_extensions_schema
+):
+    table_functions["table_functions"][0]["impls"][0]["description"] = (
+        "Generates a series of 64-bit integers."
+    )
+    Draft202012Validator(simple_extensions_schema).validate(table_functions)
+
+
 @pytest.mark.parametrize("nullability", ["MIRROR", "DECLARED_OUTPUT", "DISCRETE"])
 def test_table_function_rejects_nullability_setting(
     table_functions, simple_extensions_schema, nullability

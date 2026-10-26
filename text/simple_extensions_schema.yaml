@@ -404,6 +404,8 @@ $defs:
           properties:
             deprecated:
               $ref: "#/$defs/deprecationStatus"
+            description:
+              type: string
             args:
               $ref: "#/$defs/arguments"
             variadic:
