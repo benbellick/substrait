@@ -21,19 +21,13 @@ The specification has passed the initial design phase and is now in the final st
 | [Specialized Record Expressions](../expressions/specialized_record_expressions.md) | Specialized expression types that are more naturally expressed outside the function paradigm. Examples include items such as if/then/else and switch statements. |
 | [Aggregate Functions](../expressions/aggregate_functions.md)      | Functions that are expressed in aggregation operations. Examples include things such as SUM, COUNT, etc. Operations take many records and collapse them into a single (possibly compound) value. |
 | [Window Functions](../expressions/window_functions.md)            | Functions that relate a record to a set of encompassing records. Examples in SQL include RANK, NTILE, etc. |
+| [Table Functions](../expressions/table_functions.md)              | Functions that produce zero or more rows per invocation. `TableFunctionRel` invokes a `TableFunction` call once in the current evaluation context. For example, `generate_series` generates numeric sequences. |
 | [User Defined Functions](../expressions/user_defined_functions.md) | Reusable named functions that are built beyond the core specification. Implementations are typically registered thorough external means (drop a file in a directory, send a special command with implementation, etc.) |
 | [Embedded Functions](../expressions/embedded_functions.md)        | Functions implementations embedded directly within the plan. Frequently used in data science workflows where business logic is interspersed with standard operations. |
 | [Relation Basics](../relations/basics.md)                         | Basic concepts around relational algebra, record emit and properties. |
 | [Logical Relations](../relations/logical_relations.md)            | Common relational operations used in compute plans including project, join, aggregation, etc. |
 | [Text Serialization](../serialization/text_serialization.md)      | A human producible & consumable representation of the plan specification. |
 | [Binary Serialization](../serialization/binary_serialization.md)  | A high performance & compact binary representation of the plan specification. |
-
-
-## Components (Partially Implemented)
-
-| Section                                                      | Description                                                  |
-| ------------------------------------------------------------ | ------------------------------------------------------------ |
-| [Table Functions](../expressions/table_functions.md)              | Functions that produce zero or more rows per invocation. `TableFunctionRel` invokes a `TableFunction` call once in the current evaluation context. For example, `generate_series` generates numeric sequences. |
 
 
 ## Components (Designed but not Implemented)
