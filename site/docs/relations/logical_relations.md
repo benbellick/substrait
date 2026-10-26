@@ -102,7 +102,7 @@ possible approach is that a chunk should only be read if the midpoint of the chu
 
 #### Iceberg Table Type
 
-A Iceberg Table is a table built on [Apache Iceberg](https://iceberg.apache.org/). Iceberg tables can be read by either directly reading a [metadata file](https://iceberg.apache.org/spec/#table-metadata) or by consulting a [catalog](https://iceberg.apache.org/concepts/catalog/).
+A Iceberg Table is a table built on [Apache Iceberg](https://iceberg.apache.org/). Iceberg tables can be read by either directly reading a [metadata file](https://iceberg.apache.org/spec/#table-metadata) or by consulting a [catalog](https://iceberg.apache.org/concepts/catalog/). 
 
 ##### Metadata File Reading
 
